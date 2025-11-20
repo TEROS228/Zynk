@@ -960,6 +960,7 @@ const VideoCall = () => {
                 </svg>
               </div>
             </div>
+          </div>
           </>
         ) : (
           // Desktop Layout - Zoom Style with two equal videos
