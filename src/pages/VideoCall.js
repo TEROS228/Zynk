@@ -42,7 +42,8 @@ const VideoCall = () => {
   // Detect mobile device (only by user agent, not screen size)
   useEffect(() => {
     const checkMobile = () => {
-      const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      // Exclude iPad and tablets - treat them as desktop
+      const mobile = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && !/iPad/i.test(navigator.userAgent);
       setIsMobile(mobile);
       console.log('>>> Device check - isMobile:', mobile, 'userAgent:', navigator.userAgent);
     };
@@ -193,14 +194,30 @@ const VideoCall = () => {
         }
 
         myStreamRef.current = stream;
-        if (myVideoRef.current) {
-          myVideoRef.current.srcObject = stream;
-          console.log('>>> Initial my video stream set');
-        }
-        // For mobile layout, also set it to the large video initially
-        if (largeVideoRef.current && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-          largeVideoRef.current.srcObject = stream;
-          console.log('>>> Initial video set to largeVideoRef (mobile)');
+
+        // Check if mobile (excluding iPad)
+        const isMobileDevice = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && !/iPad/i.test(navigator.userAgent);
+
+        if (isMobileDevice) {
+          // Mobile: set to largeVideoRef initially
+          if (largeVideoRef.current) {
+            largeVideoRef.current.srcObject = stream;
+            console.log('>>> Initial video set to largeVideoRef (mobile)');
+          }
+          if (myVideoRef.current) {
+            myVideoRef.current.srcObject = stream;
+            console.log('>>> Initial my video stream set (mobile hidden)');
+          }
+        } else {
+          // Desktop: set to both largeVideoRef (for waiting) and myVideoRef (for connected)
+          if (largeVideoRef.current) {
+            largeVideoRef.current.srcObject = stream;
+            console.log('>>> Initial video set to largeVideoRef (desktop waiting)');
+          }
+          if (myVideoRef.current) {
+            myVideoRef.current.srcObject = stream;
+            console.log('>>> Initial my video stream set (desktop)');
+          }
         }
 
         // Create deterministic peer IDs based on room
