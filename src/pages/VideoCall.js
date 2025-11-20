@@ -24,6 +24,7 @@ const VideoCall = () => {
     bitrate: 0,
     quality: 'excellent' // excellent, good, poor, bad
   });
+  const [isMobile, setIsMobile] = useState(false);
 
   const myVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -38,9 +39,22 @@ const VideoCall = () => {
 
   const userName = localStorage.getItem('userName') || 'Гость';
 
-  // Sync video streams to display elements
+  // Detect mobile device (only by user agent, not screen size)
   useEffect(() => {
-    console.log('>>> useEffect: Syncing video streams');
+    const checkMobile = () => {
+      const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      setIsMobile(mobile);
+      console.log('>>> Device check - isMobile:', mobile, 'userAgent:', navigator.userAgent);
+    };
+
+    checkMobile();
+  }, []);
+
+  // Sync video streams to display elements (mobile only)
+  useEffect(() => {
+    if (!isMobile) return; // Skip for desktop layout
+
+    console.log('>>> useEffect: Syncing video streams (mobile)');
     console.log('>>> isConnected:', isConnected);
     console.log('>>> isMyVideoLarge:', isMyVideoLarge);
 
@@ -63,7 +77,7 @@ const VideoCall = () => {
         smallVideoRef.current.srcObject = myVideoRef.current.srcObject;
       }
     }
-  }, [isConnected, isMyVideoLarge]);
+  }, [isConnected, isMyVideoLarge, isMobile]);
 
   // Monitor connection quality
   useEffect(() => {
@@ -181,11 +195,12 @@ const VideoCall = () => {
         myStreamRef.current = stream;
         if (myVideoRef.current) {
           myVideoRef.current.srcObject = stream;
+          console.log('>>> Initial my video stream set');
         }
-        // Also set it to the large video initially
-        if (largeVideoRef.current) {
+        // For mobile layout, also set it to the large video initially
+        if (largeVideoRef.current && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
           largeVideoRef.current.srcObject = stream;
-          console.log('>>> Initial video set to largeVideoRef');
+          console.log('>>> Initial video set to largeVideoRef (mobile)');
         }
 
         // Create deterministic peer IDs based on room
@@ -847,45 +862,52 @@ const VideoCall = () => {
         </button>
       </div>
 
-      {/* Hidden video elements to ensure refs are always attached */}
-      <video ref={myVideoRef} autoPlay muted playsInline style={{ display: 'none' }} />
-      <video ref={remoteVideoRef} autoPlay playsInline style={{ display: 'none' }} />
+      {/* Hidden video elements for mobile layout only */}
+      {isMobile && (
+        <>
+          <video ref={myVideoRef} autoPlay muted playsInline style={{ display: 'none' }} />
+          <video ref={remoteVideoRef} autoPlay playsInline style={{ display: 'none' }} />
+        </>
+      )}
 
-      {/* Video Grid - WhatsApp Style with Switch */}
-      <div className="flex-1 relative p-4">
-        {/* Large Video */}
-        <div className="absolute inset-4 bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center rounded-3xl overflow-hidden shadow-2xl border-2 border-white/10">
-          {/* Animated background gradient */}
-          <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10 animate-gradient"></div>
+      {/* Video Grid */}
+      <div className="flex-1 relative">
+        {isMobile ? (
+          // Mobile Layout - WhatsApp Style with draggable small video
+          <>
+            {/* Large Video */}
+            <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center overflow-hidden">
+              {/* Animated background gradient */}
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10 animate-gradient"></div>
 
-          <video
-            ref={largeVideoRef}
-            autoPlay
-            muted={!isConnected || isMyVideoLarge}
-            playsInline
-            className={`relative z-10 w-full h-full object-contain ${!isConnected || isMyVideoLarge ? 'mirror' : ''}`}
-          />
+              <video
+                ref={largeVideoRef}
+                autoPlay
+                muted={!isConnected || isMyVideoLarge}
+                playsInline
+                className={`relative z-10 w-full h-full object-cover ${!isConnected || isMyVideoLarge ? 'mirror' : ''}`}
+              />
 
-          {!isConnected && (
-            <div className="absolute inset-0 flex items-center justify-center z-20">
-              <div className="text-center">
-                <div className="inline-flex items-center justify-center w-24 h-24 mb-6 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-full backdrop-blur-xl border-2 border-white/20">
-                  <svg className="w-12 h-12 text-white/60 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
+              {!isConnected && (
+                <div className="absolute inset-0 flex items-center justify-center z-20">
+                  <div className="text-center">
+                    <div className="inline-flex items-center justify-center w-24 h-24 mb-6 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-full backdrop-blur-xl border-2 border-white/20">
+                      <svg className="w-12 h-12 text-white/60 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                    <p className="text-white text-lg font-semibold mb-2">Ожидание участника...</p>
+                    <p className="text-white/60 text-sm">Поделитесь ссылкой для подключения</p>
+                  </div>
                 </div>
-                <p className="text-white text-lg font-semibold mb-2">Ожидание участника...</p>
-                <p className="text-white/60 text-sm">Поделитесь ссылкой для подключения</p>
-              </div>
+              )}
+
+              {/* Corner decoration */}
+              <div className="absolute top-0 left-0 w-32 h-32 bg-gradient-to-br from-indigo-500/20 to-transparent rounded-br-full pointer-events-none"></div>
+              <div className="absolute bottom-0 right-0 w-32 h-32 bg-gradient-to-tl from-purple-500/20 to-transparent rounded-tl-full pointer-events-none"></div>
             </div>
-          )}
 
-          {/* Corner decoration */}
-          <div className="absolute top-0 left-0 w-32 h-32 bg-gradient-to-br from-indigo-500/20 to-transparent rounded-br-full pointer-events-none"></div>
-          <div className="absolute bottom-0 right-0 w-32 h-32 bg-gradient-to-tl from-purple-500/20 to-transparent rounded-tl-full pointer-events-none"></div>
-        </div>
-
-        {/* Small Video (draggable & clickable) - Always render but hide when not connected */}
+            {/* Small Video (draggable & clickable) */}
         <div
           style={{
             left: `${smallVideoPosition.x}px`,
@@ -938,7 +960,85 @@ const VideoCall = () => {
                 </svg>
               </div>
             </div>
-        </div>
+          </>
+        ) : (
+          // Desktop Layout - Zoom Style with two equal videos
+          <>
+            {!isConnected ? (
+              // Waiting state - one large video
+              <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10 animate-gradient"></div>
+
+                <video
+                  ref={largeVideoRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="relative z-10 w-full h-full object-cover mirror"
+                />
+
+                <div className="absolute inset-0 flex items-center justify-center z-20">
+                  <div className="text-center">
+                    <div className="inline-flex items-center justify-center w-24 h-24 mb-6 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-full backdrop-blur-xl border-2 border-white/20">
+                      <svg className="w-12 h-12 text-white/60 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                    <p className="text-white text-lg font-semibold mb-2">Ожидание участника...</p>
+                    <p className="text-white/60 text-sm">Поделитесь ссылкой для подключения</p>
+                  </div>
+                </div>
+
+                <div className="absolute top-0 left-0 w-32 h-32 bg-gradient-to-br from-indigo-500/20 to-transparent rounded-br-full pointer-events-none"></div>
+                <div className="absolute bottom-0 right-0 w-32 h-32 bg-gradient-to-tl from-purple-500/20 to-transparent rounded-tl-full pointer-events-none"></div>
+              </div>
+            ) : (
+              // Connected state - two equal videos side by side
+              <div className="absolute inset-0 grid grid-cols-2 gap-0">
+                {/* My Video */}
+                <div className="relative bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10"></div>
+
+                  <video
+                    ref={myVideoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="relative z-10 w-full h-full object-cover mirror"
+                  />
+
+                  {/* Name badge */}
+                  <div className="absolute bottom-4 left-4 right-4 px-4 py-2 bg-gradient-to-r from-black/80 to-black/60 backdrop-blur-xl rounded-xl border border-white/20 shadow-lg">
+                    <p className="text-white font-semibold text-sm truncate">{userName}</p>
+                  </div>
+
+                  {/* Corner decoration */}
+                  <div className="absolute top-0 left-0 w-24 h-24 bg-gradient-to-br from-indigo-500/20 to-transparent rounded-br-full pointer-events-none"></div>
+                </div>
+
+                {/* Remote Video */}
+                <div className="relative bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-indigo-500/10"></div>
+
+                  <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    className="relative z-10 w-full h-full object-cover"
+                  />
+
+                  {/* Name badge */}
+                  <div className="absolute bottom-4 left-4 right-4 px-4 py-2 bg-gradient-to-r from-black/80 to-black/60 backdrop-blur-xl rounded-xl border border-white/20 shadow-lg">
+                    <p className="text-white font-semibold text-sm truncate">Собеседник</p>
+                  </div>
+
+                  {/* Corner decoration */}
+                  <div className="absolute bottom-0 right-0 w-24 h-24 bg-gradient-to-tl from-purple-500/20 to-transparent rounded-tl-full pointer-events-none"></div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Controls */}
