@@ -53,33 +53,25 @@ const VideoCall = () => {
     checkMobile();
   }, []);
 
-  // Auto-hide controls after inactivity
+  // Show controls when cursor is at top or bottom of screen
   useEffect(() => {
-    const handleMouseMove = () => {
-      setShowControls(true);
+    const handleMouseMove = (e) => {
+      const windowHeight = window.innerHeight;
+      const cursorY = e.clientY;
 
-      // Clear existing timeout
-      if (hideControlsTimeoutRef.current) {
-        clearTimeout(hideControlsTimeoutRef.current);
-      }
-
-      // Set new timeout to hide controls after 3 seconds
-      hideControlsTimeoutRef.current = setTimeout(() => {
+      // Show controls if cursor is in top 100px or bottom 100px
+      if (cursorY < 100 || cursorY > windowHeight - 100) {
+        setShowControls(true);
+      } else {
         setShowControls(false);
-      }, 3000);
+      }
     };
-
-    // Show controls initially
-    handleMouseMove();
 
     // Add event listener
     window.addEventListener('mousemove', handleMouseMove);
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
-      if (hideControlsTimeoutRef.current) {
-        clearTimeout(hideControlsTimeoutRef.current);
-      }
     };
   }, []);
 
@@ -822,7 +814,7 @@ const VideoCall = () => {
       <video ref={remoteVideoRef} autoPlay playsInline style={{ display: 'none' }} />
 
       {/* Header */}
-      <div className={`absolute top-0 left-0 right-0 z-50 bg-gradient-to-r from-gray-900/95 via-gray-800/95 to-gray-900/95 backdrop-blur-md px-6 py-4 flex items-center justify-between border-b border-indigo-500/20 shadow-lg transition-transform duration-300 ${showControls ? 'translate-y-0' : '-translate-y-full'}`}>
+      <div className={`absolute top-0 left-0 right-0 z-50 px-6 py-4 flex items-center justify-between transition-transform duration-300 ${showControls ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
             <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
@@ -1088,7 +1080,7 @@ const VideoCall = () => {
       </div>
 
       {/* Controls */}
-      <div className={`absolute bottom-0 left-0 right-0 z-50 bg-gradient-to-t from-gray-900/95 via-gray-800/95 to-gray-900/95 backdrop-blur-md px-4 py-6 border-t border-indigo-500/20 shadow-lg transition-transform duration-300 ${showControls ? 'translate-y-0' : 'translate-y-full'}`}>
+      <div className={`absolute bottom-0 left-0 right-0 z-50 px-4 py-6 transition-transform duration-300 ${showControls ? 'translate-y-0' : 'translate-y-full'}`}>
         <div className="max-w-4xl mx-auto flex items-center justify-center gap-4">
           <button
             onClick={toggleMic}
