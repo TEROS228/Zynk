@@ -19,7 +19,7 @@ const Login = ({ onLogin }) => {
       const existingUser = users.find(u => u.email === formData.email);
 
       if (existingUser) {
-        alert('Пользователь с таким email уже существует!');
+        alert('A user with this email already exists!');
         return;
       }
 
@@ -27,7 +27,7 @@ const Login = ({ onLogin }) => {
         id: Date.now(),
         name: formData.name,
         email: formData.email,
-        password: formData.password // В реальном приложении нужно хешировать!
+        password: formData.password
       };
 
       users.push(newUser);
@@ -46,7 +46,7 @@ const Login = ({ onLogin }) => {
         onLogin(user);
         navigate('/');
       } else {
-        alert('Неверный email или пароль!');
+        alert('Invalid email or password!');
       }
     }
   };
@@ -65,7 +65,7 @@ const Login = ({ onLogin }) => {
             <h1 className="text-4xl font-black text-white">Zynk</h1>
           </div>
           <p className="text-gray-300">
-            {isRegister ? 'Создайте аккаунт' : 'Войдите в аккаунт'}
+            {isRegister ? 'Create an account' : 'Sign in to your account'}
           </p>
         </div>
 
@@ -75,7 +75,7 @@ const Login = ({ onLogin }) => {
             {isRegister && (
               <div>
                 <label className="block text-sm font-semibold text-white mb-2">
-                  Имя
+                  Name
                 </label>
                 <input
                   type="text"
@@ -83,7 +83,7 @@ const Login = ({ onLogin }) => {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                  placeholder="Введите ваше имя"
+                  placeholder="Enter your name"
                 />
               </div>
             )}
@@ -104,7 +104,7 @@ const Login = ({ onLogin }) => {
 
             <div>
               <label className="block text-sm font-semibold text-white mb-2">
-                Пароль
+                Password
               </label>
               <input
                 type="password"
@@ -120,7 +120,7 @@ const Login = ({ onLogin }) => {
               type="submit"
               className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg shadow-indigo-500/50 hover:shadow-indigo-500/70"
             >
-              {isRegister ? 'Зарегистрироваться' : 'Войти'}
+              {isRegister ? 'Sign Up' : 'Sign In'}
             </button>
           </form>
 
@@ -129,7 +129,7 @@ const Login = ({ onLogin }) => {
               onClick={() => setIsRegister(!isRegister)}
               className="text-indigo-300 hover:text-white transition-colors font-medium"
             >
-              {isRegister ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Зарегистрироваться'}
+              {isRegister ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
             </button>
           </div>
         </div>
@@ -140,7 +140,7 @@ const Login = ({ onLogin }) => {
             onClick={() => navigate('/')}
             className="text-gray-400 hover:text-white transition-colors text-sm"
           >
-            ← Вернуться на главную
+            ← Back to Home
           </button>
         </div>
       </div>

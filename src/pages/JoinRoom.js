@@ -10,7 +10,7 @@ const JoinRoom = ({ user }) => {
     e.preventDefault();
     if (roomName.trim()) {
       const finalRoomName = roomName.trim().toLowerCase().replace(/\s+/g, '-');
-      const nameToUse = user?.name || userName.trim() || 'Гость';
+      const nameToUse = user?.name || userName.trim() || 'Guest';
       localStorage.setItem('userName', nameToUse);
       navigate(`/room/${finalRoomName}`);
     }
@@ -18,7 +18,7 @@ const JoinRoom = ({ user }) => {
 
   const handleCreateRoom = () => {
     const randomRoom = `room-${Math.random().toString(36).substring(2, 9)}`;
-    const nameToUse = user?.name || userName.trim() || 'Гость';
+    const nameToUse = user?.name || userName.trim() || 'Guest';
     localStorage.setItem('userName', nameToUse);
     navigate(`/room/${randomRoom}`);
   };
@@ -33,7 +33,7 @@ const JoinRoom = ({ user }) => {
           <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          Назад
+          Back
         </button>
 
         <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-2xl p-8">
@@ -47,34 +47,34 @@ const JoinRoom = ({ user }) => {
               </div>
             </div>
             <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 mb-2">
-              Присоединиться к звонку
+              Join a Call
             </h2>
-            <p className="text-gray-600">Мгновенное подключение за секунду ⚡</p>
+            <p className="text-gray-600">Instant connection in a second ⚡</p>
           </div>
 
           <form onSubmit={handleJoinRoom} className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ваше имя
+                Your Name
               </label>
               <input
                 type="text"
                 value={userName}
                 onChange={(e) => setUserName(e.target.value)}
-                placeholder="Введите ваше имя"
+                placeholder="Enter your name"
                 className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:outline-none transition-colors bg-white/50"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Название комнаты
+                Room Name
               </label>
               <input
                 type="text"
                 value={roomName}
                 onChange={(e) => setRoomName(e.target.value)}
-                placeholder="Например: team-meeting"
+                placeholder="e.g. team-meeting"
                 className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:outline-none transition-colors bg-white/50"
               />
             </div>
@@ -84,7 +84,7 @@ const JoinRoom = ({ user }) => {
               disabled={!roomName.trim()}
               className="w-full px-6 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
             >
-              Присоединиться к комнате
+              Join Room
             </button>
           </form>
 
@@ -93,7 +93,7 @@ const JoinRoom = ({ user }) => {
               <div className="w-full border-t border-gray-300"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-white/80 text-gray-500">или</span>
+              <span className="px-4 bg-white/80 text-gray-500">or</span>
             </div>
           </div>
 
@@ -105,12 +105,12 @@ const JoinRoom = ({ user }) => {
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              Быстрый звонок ⚡
+              Quick Call ⚡
             </span>
           </button>
 
           <div className="mt-6 text-center text-sm text-gray-500">
-            <p>Ссылку на комнату можно будет отправить другим участникам</p>
+            <p>You can share the room link with other participants</p>
           </div>
         </div>
       </div>

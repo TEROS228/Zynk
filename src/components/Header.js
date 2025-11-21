@@ -30,13 +30,13 @@ const Header = ({ user, onLogout }) => {
               onClick={() => navigate('/')}
               className="text-gray-200 hover:text-white transition-colors font-medium"
             >
-              Главная
+              Home
             </button>
             <button
               onClick={() => navigate('/join')}
               className="text-gray-200 hover:text-white transition-colors font-medium"
             >
-              Присоединиться
+              Join
             </button>
           </nav>
 
@@ -57,7 +57,7 @@ const Header = ({ user, onLogout }) => {
                   onClick={onLogout}
                   className="px-4 py-2 bg-red-600/20 text-red-300 rounded-lg hover:bg-red-600/30 transition-colors text-sm font-medium border border-red-500/30"
                 >
-                  Выйти
+                  Sign Out
                 </button>
               </div>
             ) : (
@@ -65,7 +65,7 @@ const Header = ({ user, onLogout }) => {
                 onClick={() => navigate('/login')}
                 className="px-6 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all font-semibold shadow-lg shadow-indigo-500/30"
               >
-                Войти
+                Sign In
               </button>
             )}
           </div>

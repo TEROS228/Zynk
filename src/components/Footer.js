@@ -15,8 +15,8 @@ const Footer = () => {
               />
             </div>
             <p className="text-gray-400 max-w-md mb-4">
-              Быстрые и безопасные видеозвонки с энергией молнии.
-              Подключайтесь к друзьям и коллегам мгновенно.
+              Fast and secure video calls with lightning energy.
+              Connect with friends and colleagues instantly.
             </p>
             <div className="flex space-x-4">
               <a href="#" className="text-gray-400 hover:text-white transition-colors">
@@ -39,22 +39,22 @@ const Footer = () => {
 
           {/* Quick Links */}
           <div>
-            <h4 className="text-white font-semibold mb-4">Навигация</h4>
+            <h4 className="text-white font-semibold mb-4">Navigation</h4>
             <ul className="space-y-2">
-              <li><a href="/" className="text-gray-400 hover:text-white transition-colors">Главная</a></li>
-              <li><a href="/join" className="text-gray-400 hover:text-white transition-colors">Присоединиться</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">О нас</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Контакты</a></li>
+              <li><a href="/" className="text-gray-400 hover:text-white transition-colors">Home</a></li>
+              <li><a href="/join" className="text-gray-400 hover:text-white transition-colors">Join</a></li>
+              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">About</a></li>
+              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Contact</a></li>
             </ul>
           </div>
 
           {/* Legal */}
           <div>
-            <h4 className="text-white font-semibold mb-4">Информация</h4>
+            <h4 className="text-white font-semibold mb-4">Information</h4>
             <ul className="space-y-2">
-              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Конфиденциальность</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Условия</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Поддержка</a></li>
+              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Privacy</a></li>
+              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Terms</a></li>
+              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Support</a></li>
               <li><a href="#" className="text-gray-400 hover:text-white transition-colors">FAQ</a></li>
             </ul>
           </div>
@@ -63,10 +63,10 @@ const Footer = () => {
         {/* Bottom Bar */}
         <div className="mt-8 pt-8 border-t border-gray-800 flex flex-col sm:flex-row justify-between items-center">
           <p className="text-gray-500 text-sm">
-            © 2024 Zynk. Все права защищены.
+            © 2024 Zynk. All rights reserved.
           </p>
           <p className="text-gray-500 text-sm mt-2 sm:mt-0">
-            Сделано с ⚡ энергией
+            Made with ⚡ energy
           </p>
         </div>
       </div>

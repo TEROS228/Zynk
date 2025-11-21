@@ -61,7 +61,7 @@ const VideoCall = () => {
   const statsIntervalRef = useRef(null);
   const hideControlsTimeoutRef = useRef(null);
 
-  const userName = localStorage.getItem('userName') || 'Гость';
+  const userName = localStorage.getItem('userName') || 'Guest';
 
   // Detect mobile device (only by user agent, not screen size)
   useEffect(() => {
@@ -651,19 +651,19 @@ const VideoCall = () => {
             newPeer.on('error', (err) => {
               console.error('Participant peer error:', err);
               if (mounted && err.type !== 'peer-unavailable' && err.type !== 'unavailable-id' && !(err.message && err.message.includes('is taken'))) {
-                setError('Ошибка соединения: ' + err.type);
+                setError('Connection error: ' + err.type);
               }
             });
             }, 500); // Wait 500ms before creating new peer
           } else if (err.type !== 'peer-unavailable' && !(err.message && err.message.includes('Could not connect to peer'))) {
-            setError('Ошибка соединения: ' + err.type);
+            setError('Connection error: ' + err.type);
           }
         });
 
       } catch (err) {
         console.error('Error getting media:', err);
         if (mounted) {
-          setError('Не удалось получить доступ к камере/микрофону');
+          setError('Could not access camera/microphone');
         }
       }
     };
@@ -811,7 +811,7 @@ const VideoCall = () => {
   const copyRoomLink = () => {
     const link = window.location.href;
     navigator.clipboard.writeText(link);
-    alert('Ссылка скопирована! Отправьте её другому участнику.');
+    alert('Link copied! Send it to another participant.');
   };
 
   const startScreenShare = async () => {
@@ -855,7 +855,7 @@ const VideoCall = () => {
 
     } catch (err) {
       console.error('Error starting screen share:', err);
-      alert('Не удалось начать демонстрацию экрана');
+      alert('Could not start screen sharing');
     }
   };
 
@@ -1172,7 +1172,7 @@ const VideoCall = () => {
       worldX: data.x,
       worldY: data.y,
       visible: true,
-      name: data.name || 'Участник'
+      name: data.name || 'Participant'
     });
   };
 
@@ -1262,13 +1262,13 @@ const VideoCall = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Ошибка</h2>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Error</h2>
           <p className="text-gray-600 mb-6">{error}</p>
           <button
             onClick={() => navigate('/')}
             className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors"
           >
-            Вернуться на главную
+            Back to Home
           </button>
         </div>
       </div>
@@ -1292,7 +1292,7 @@ const VideoCall = () => {
             <h1 className="text-white font-bold text-lg tracking-wide">{roomName}</h1>
           </div>
           <span className={`px-4 py-1.5 rounded-full text-xs font-semibold ${isConnected ? 'bg-gradient-to-r from-green-500/20 to-emerald-500/20 text-green-400 border border-green-500/30' : 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-400 border border-yellow-500/30'}`}>
-            {isConnected ? '● Подключено' : '○ Ожидание...'}
+            {isConnected ? '● Connected' : '○ Waiting...'}
           </span>
 
           {/* Connection Quality Indicator */}
@@ -1309,7 +1309,7 @@ const VideoCall = () => {
                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
                     </svg>
-                    Отлично
+                    Excellent
                   </>
                 )}
                 {connectionQuality.quality === 'good' && (
@@ -1317,7 +1317,7 @@ const VideoCall = () => {
                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7z" />
                     </svg>
-                    Хорошо
+                    Good
                   </>
                 )}
                 {connectionQuality.quality === 'poor' && (
@@ -1325,7 +1325,7 @@ const VideoCall = () => {
                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5z" />
                     </svg>
-                    Средне
+                    Fair
                   </>
                 )}
                 {connectionQuality.quality === 'bad' && (
@@ -1333,7 +1333,7 @@ const VideoCall = () => {
                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M13.477 14.89A6 6 0 015.11 6.524l8.367 8.368zm1.414-1.414L6.524 5.11a6 6 0 018.367 8.367zM18 10a8 8 0 11-16 0 8 8 0 0116 0z" clipRule="evenodd" />
                     </svg>
-                    Плохо
+                    Poor
                   </>
                 )}
               </div>
@@ -1342,23 +1342,23 @@ const VideoCall = () => {
               <div className="absolute top-full left-0 mt-2 w-56 bg-gray-900/95 backdrop-blur-xl border border-white/20 rounded-xl p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 shadow-2xl z-50">
                 <div className="text-white space-y-2">
                   <div className="flex justify-between items-center pb-2 border-b border-white/10">
-                    <span className="text-xs font-semibold text-gray-300">Статистика соединения</span>
+                    <span className="text-xs font-semibold text-gray-300">Connection Stats</span>
                   </div>
                   <div className="space-y-1.5">
                     <div className="flex justify-between">
-                      <span className="text-xs text-gray-400">Задержка (RTT):</span>
+                      <span className="text-xs text-gray-400">Latency (RTT):</span>
                       <span className="text-xs font-semibold">{connectionQuality.rtt}ms</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-xs text-gray-400">Потеря пакетов:</span>
+                      <span className="text-xs text-gray-400">Packet Loss:</span>
                       <span className="text-xs font-semibold">{connectionQuality.packetLoss}%</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-xs text-gray-400">Дрожание:</span>
+                      <span className="text-xs text-gray-400">Jitter:</span>
                       <span className="text-xs font-semibold">{connectionQuality.jitter}ms</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-xs text-gray-400">Битрейт:</span>
+                      <span className="text-xs text-gray-400">Bitrate:</span>
                       <span className="text-xs font-semibold">{connectionQuality.bitrate} kbps</span>
                     </div>
                   </div>
@@ -1374,7 +1374,7 @@ const VideoCall = () => {
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          Пригласить участника
+          Invite Participant
         </button>
       </div>
 
@@ -1472,7 +1472,7 @@ const VideoCall = () => {
               <button
                 onClick={() => setTool('pen')}
                 className={`p-3 rounded-xl transition-all ${tool === 'pen' ? 'bg-indigo-600' : 'bg-gray-700 hover:bg-gray-600'}`}
-                title="Карандаш"
+                title="Pen"
               >
                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -1482,7 +1482,7 @@ const VideoCall = () => {
               <button
                 onClick={() => setTool('eraser')}
                 className={`p-3 rounded-xl transition-all ${tool === 'eraser' ? 'bg-indigo-600' : 'bg-gray-700 hover:bg-gray-600'}`}
-                title="Ластик"
+                title="Eraser"
               >
                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1492,7 +1492,7 @@ const VideoCall = () => {
               <button
                 onClick={() => setTool('pan')}
                 className={`p-3 rounded-xl transition-all ${tool === 'pan' ? 'bg-indigo-600' : 'bg-gray-700 hover:bg-gray-600'}`}
-                title="Перемещение (Shift+перетаскивание)"
+                title="Pan (Shift+drag)"
               >
                 <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M10 7l1.44 1.44L7.88 12l3.56 3.56L10 17l-5-5 5-5zm4 0l5 5-5 5-1.44-1.44L16.12 12l-3.56-3.56L14 7z" />
@@ -1502,7 +1502,7 @@ const VideoCall = () => {
               <button
                 onClick={clearCanvas}
                 className="p-3 rounded-xl bg-red-600 hover:bg-red-700 transition-all"
-                title="Очистить"
+                title="Clear"
               >
                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1532,7 +1532,7 @@ const VideoCall = () => {
               />
               {/* Pan hint */}
               <div className="text-[10px] text-gray-400 text-center mt-1">
-                Shift + тащить = перемещение
+                Shift + drag = pan
               </div>
             </div>
 
@@ -1621,8 +1621,8 @@ const VideoCall = () => {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
                     </div>
-                    <p className="text-white text-lg font-semibold mb-2">Ожидание участника...</p>
-                    <p className="text-white/60 text-sm">Поделитесь ссылкой для подключения</p>
+                    <p className="text-white text-lg font-semibold mb-2">Waiting for participant...</p>
+                    <p className="text-white/60 text-sm">Share the link to connect</p>
                   </div>
                 </div>
               )}
@@ -1666,7 +1666,7 @@ const VideoCall = () => {
 
             {/* Name badge */}
             <div className="absolute bottom-3 left-3 right-3 px-3 py-2 bg-gradient-to-r from-black/80 to-black/60 backdrop-blur-xl rounded-xl border border-white/20 shadow-lg">
-              <p className="text-white font-semibold text-xs truncate">{isMyVideoLarge ? 'Собеседник' : userName}</p>
+              <p className="text-white font-semibold text-xs truncate">{isMyVideoLarge ? 'Partner' : userName}</p>
             </div>
 
             {/* Action icons */}
@@ -1710,8 +1710,8 @@ const VideoCall = () => {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
                     </div>
-                    <p className="text-white text-lg font-semibold mb-2">Ожидание участника...</p>
-                    <p className="text-white/60 text-sm">Поделитесь ссылкой для подключения</p>
+                    <p className="text-white text-lg font-semibold mb-2">Waiting for participant...</p>
+                    <p className="text-white/60 text-sm">Share the link to connect</p>
                   </div>
                 </div>
 
@@ -1755,7 +1755,7 @@ const VideoCall = () => {
 
                   {/* Name badge */}
                   <div className="absolute bottom-4 left-4 right-4 px-4 py-2 bg-gradient-to-r from-black/80 to-black/60 backdrop-blur-xl rounded-xl border border-white/20 shadow-lg">
-                    <p className="text-white font-semibold text-sm truncate">Собеседник</p>
+                    <p className="text-white font-semibold text-sm truncate">Partner</p>
                   </div>
 
                   {/* Corner decoration */}
@@ -1777,7 +1777,7 @@ const VideoCall = () => {
                 ? 'bg-gradient-to-br from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 shadow-lg'
                 : 'bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-lg shadow-red-500/50'
             } text-white active:scale-95`}
-            title={isMicOn ? 'Выключить микрофон' : 'Включить микрофон'}
+            title={isMicOn ? 'Mute microphone' : 'Unmute microphone'}
           >
             {isMicOn ? (
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1798,7 +1798,7 @@ const VideoCall = () => {
                 ? 'bg-gradient-to-br from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 shadow-lg'
                 : 'bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-lg shadow-red-500/50'
             } text-white active:scale-95`}
-            title={isCameraOn ? 'Выключить камеру' : 'Включить камеру'}
+            title={isCameraOn ? 'Turn off camera' : 'Turn on camera'}
           >
             {isCameraOn ? (
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1818,7 +1818,7 @@ const VideoCall = () => {
                 ? 'bg-gradient-to-br from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 shadow-lg shadow-indigo-500/50'
                 : 'bg-gradient-to-br from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 shadow-lg'
             } text-white active:scale-95`}
-            title={isScreenSharing ? 'Остановить демонстрацию' : 'Демонстрация экрана'}
+            title={isScreenSharing ? 'Stop sharing' : 'Share screen'}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -1832,7 +1832,7 @@ const VideoCall = () => {
                 ? 'bg-gradient-to-br from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-lg shadow-green-500/50'
                 : 'bg-gradient-to-br from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 shadow-lg'
             } text-white active:scale-95`}
-            title={isWhiteboardActive ? 'Закрыть доску' : 'Открыть доску'}
+            title={isWhiteboardActive ? 'Close whiteboard' : 'Open whiteboard'}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
@@ -1842,12 +1842,12 @@ const VideoCall = () => {
           <button
             onClick={leaveCall}
             className="group relative p-4 px-8 rounded-2xl bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white transition-all duration-200 shadow-lg shadow-red-500/50 hover:shadow-red-500/70 active:scale-95 ml-2 flex items-center gap-3"
-            title="Завершить звонок"
+            title="End call"
           >
             <svg className="w-6 h-6 rotate-135" fill="currentColor" viewBox="0 0 24 24">
               <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 00-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z" />
             </svg>
-            <span className="font-semibold">Завершить</span>
+            <span className="font-semibold">End Call</span>
           </button>
         </div>
       </div>
