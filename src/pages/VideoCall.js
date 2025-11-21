@@ -1166,7 +1166,7 @@ const VideoCall = () => {
 
       {/* Video Grid - Fullscreen */}
       <div className="absolute inset-0">
-        {(isWhiteboardActive || remoteWhiteboardActive) && isConnected ? (
+        {(isWhiteboardActive || remoteWhiteboardActive) ? (
           // Whiteboard Layout - Canvas fullscreen, cameras in top right corner
           <>
             {/* Whiteboard Canvas - Fullscreen */}
@@ -1240,28 +1240,30 @@ const VideoCall = () => {
               />
             </div>
 
-            {/* Small Cameras in Top Right Corner */}
-            <div className="absolute top-4 right-4 z-20 flex gap-2">
-              {/* My Camera */}
-              <div className="w-32 h-24 bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-white/20">
-                <video
-                  ref={mySmallCameraRef}
-                  autoPlay
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover mirror"
-                />
+            {/* Small Cameras in Top Right Corner - only show when connected */}
+            {isConnected && (
+              <div className="absolute top-4 right-4 z-20 flex gap-2">
+                {/* My Camera */}
+                <div className="w-32 h-24 bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-white/20">
+                  <video
+                    ref={mySmallCameraRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover mirror"
+                  />
+                </div>
+                {/* Remote Camera */}
+                <div className="w-32 h-24 bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-white/20">
+                  <video
+                    ref={remoteSmallCameraRef}
+                    autoPlay
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                </div>
               </div>
-              {/* Remote Camera */}
-              <div className="w-32 h-24 bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-white/20">
-                <video
-                  ref={remoteSmallCameraRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            </div>
+            )}
           </>
         ) : (isScreenSharing || remoteScreenSharing) && isConnected ? (
           // Screen Sharing Layout - Screen fullscreen, cameras in top right corner
