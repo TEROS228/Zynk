@@ -28,8 +28,16 @@ const VideoCall = () => {
   const [showControls, setShowControls] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [remoteScreenSharing, setRemoteScreenSharing] = useState(false);
+  const [isWhiteboardActive, setIsWhiteboardActive] = useState(false);
+  const [remoteWhiteboardActive, setRemoteWhiteboardActive] = useState(false);
+  const [brushColor, setBrushColor] = useState('#ffffff');
+  const [brushSize, setBrushSize] = useState(3);
+  const [tool, setTool] = useState('pen'); // pen, eraser
+  const [isDrawing, setIsDrawing] = useState(false);
 
   const myVideoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const ctxRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const largeVideoRef = useRef(null);
   const smallVideoRef = useRef(null);
@@ -81,9 +89,9 @@ const VideoCall = () => {
     };
   }, []);
 
-  // Sync video streams for screen sharing layout
+  // Sync video streams for screen sharing and whiteboard layout
   useEffect(() => {
-    if ((isScreenSharing || remoteScreenSharing) && isConnected) {
+    if (((isScreenSharing || remoteScreenSharing) || (isWhiteboardActive || remoteWhiteboardActive)) && isConnected) {
       // Set my camera to small camera ref
       if (mySmallCameraRef.current && myStreamRef.current) {
         mySmallCameraRef.current.srcObject = myStreamRef.current;
@@ -93,7 +101,7 @@ const VideoCall = () => {
         remoteSmallCameraRef.current.srcObject = remoteVideoRef.current.srcObject;
       }
     }
-  }, [isScreenSharing, remoteScreenSharing, isConnected]);
+  }, [isScreenSharing, remoteScreenSharing, isWhiteboardActive, remoteWhiteboardActive, isConnected]);
 
   // Sync video streams to display elements (mobile only)
   useEffect(() => {
@@ -404,6 +412,21 @@ const VideoCall = () => {
             } else if (data.type === 'screen-share-stop') {
               console.log('>>> HOST: Participant stopped screen sharing');
               setRemoteScreenSharing(false);
+            } else if (data.type === 'whiteboard-start') {
+              setRemoteWhiteboardActive(true);
+              setTimeout(() => initCanvas(), 100);
+            } else if (data.type === 'whiteboard-stop') {
+              setRemoteWhiteboardActive(false);
+            } else if (data.type === 'whiteboard-draw') {
+              handleRemoteDrawing(data);
+            } else if (data.type === 'whiteboard-clear') {
+              const canvas = canvasRef.current;
+              const ctx = ctxRef.current;
+              if (canvas && ctx) {
+                ctx.fillStyle = '#1a1a2e';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.beginPath();
+              }
             }
           });
         });
@@ -578,6 +601,21 @@ const VideoCall = () => {
                 } else if (data.type === 'screen-share-stop') {
                   console.log('>>> PARTICIPANT: Host stopped screen sharing');
                   setRemoteScreenSharing(false);
+                } else if (data.type === 'whiteboard-start') {
+                  setRemoteWhiteboardActive(true);
+                  setTimeout(() => initCanvas(), 100);
+                } else if (data.type === 'whiteboard-stop') {
+                  setRemoteWhiteboardActive(false);
+                } else if (data.type === 'whiteboard-draw') {
+                  handleRemoteDrawing(data);
+                } else if (data.type === 'whiteboard-clear') {
+                  const canvas = canvasRef.current;
+                  const ctx = ctxRef.current;
+                  if (canvas && ctx) {
+                    ctx.fillStyle = '#1a1a2e';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.beginPath();
+                  }
                 }
               });
             });
@@ -821,6 +859,124 @@ const VideoCall = () => {
     setIsScreenSharing(false);
   };
 
+  const toggleWhiteboard = () => {
+    const newState = !isWhiteboardActive;
+    setIsWhiteboardActive(newState);
+
+    // Notify remote user
+    if (dataConnRef.current) {
+      dataConnRef.current.send({ type: newState ? 'whiteboard-start' : 'whiteboard-stop' });
+    }
+
+    // Initialize canvas when opening
+    if (newState) {
+      setTimeout(() => {
+        initCanvas();
+      }, 100);
+    }
+  };
+
+  const initCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Set canvas size to fill container
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctxRef.current = ctx;
+  };
+
+  const startDrawing = (e) => {
+    const canvas = canvasRef.current;
+    const ctx = ctxRef.current;
+    if (!canvas || !ctx) return;
+
+    setIsDrawing(true);
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
+    const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top;
+
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
+
+  const draw = (e) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    const ctx = ctxRef.current;
+    if (!canvas || !ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
+    const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top;
+
+    ctx.strokeStyle = tool === 'eraser' ? '#1a1a2e' : brushColor;
+    ctx.lineWidth = tool === 'eraser' ? brushSize * 3 : brushSize;
+    ctx.lineTo(x, y);
+    ctx.stroke();
+
+    // Send drawing data to remote
+    if (dataConnRef.current) {
+      dataConnRef.current.send({
+        type: 'whiteboard-draw',
+        x: x / canvas.width,
+        y: y / canvas.height,
+        color: tool === 'eraser' ? '#1a1a2e' : brushColor,
+        size: tool === 'eraser' ? brushSize * 3 : brushSize,
+        drawing: true
+      });
+    }
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+    if (ctxRef.current) {
+      ctxRef.current.beginPath();
+    }
+    // Notify remote that stroke ended
+    if (dataConnRef.current) {
+      dataConnRef.current.send({ type: 'whiteboard-draw', drawing: false });
+    }
+  };
+
+  const handleRemoteDrawing = (data) => {
+    const canvas = canvasRef.current;
+    const ctx = ctxRef.current;
+    if (!canvas || !ctx) return;
+
+    if (data.drawing) {
+      const x = data.x * canvas.width;
+      const y = data.y * canvas.height;
+      ctx.strokeStyle = data.color;
+      ctx.lineWidth = data.size;
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+    }
+  };
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    const ctx = ctxRef.current;
+    if (!canvas || !ctx) return;
+
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.beginPath();
+
+    // Notify remote
+    if (dataConnRef.current) {
+      dataConnRef.current.send({ type: 'whiteboard-clear' });
+    }
+  };
+
   const switchVideo = () => {
     setIsMyVideoLarge(!isMyVideoLarge);
   };
@@ -1010,7 +1166,104 @@ const VideoCall = () => {
 
       {/* Video Grid - Fullscreen */}
       <div className="absolute inset-0">
-        {(isScreenSharing || remoteScreenSharing) && isConnected ? (
+        {(isWhiteboardActive || remoteWhiteboardActive) && isConnected ? (
+          // Whiteboard Layout - Canvas fullscreen, cameras in top right corner
+          <>
+            {/* Whiteboard Canvas - Fullscreen */}
+            <div className="absolute inset-0 bg-[#1a1a2e] flex items-center justify-center overflow-hidden">
+              <canvas
+                ref={canvasRef}
+                className="w-full h-full cursor-crosshair"
+                onMouseDown={startDrawing}
+                onMouseMove={draw}
+                onMouseUp={stopDrawing}
+                onMouseLeave={stopDrawing}
+                onTouchStart={startDrawing}
+                onTouchMove={draw}
+                onTouchEnd={stopDrawing}
+              />
+            </div>
+
+            {/* Whiteboard Tools */}
+            <div className="absolute top-20 left-4 z-30 flex flex-col gap-2 bg-gray-900/80 backdrop-blur-md rounded-2xl p-3 border border-white/10">
+              {/* Pen Tool */}
+              <button
+                onClick={() => setTool('pen')}
+                className={`p-3 rounded-xl transition-all ${tool === 'pen' ? 'bg-indigo-600' : 'bg-gray-700 hover:bg-gray-600'}`}
+                title="Карандаш"
+              >
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </button>
+              {/* Eraser Tool */}
+              <button
+                onClick={() => setTool('eraser')}
+                className={`p-3 rounded-xl transition-all ${tool === 'eraser' ? 'bg-indigo-600' : 'bg-gray-700 hover:bg-gray-600'}`}
+                title="Ластик"
+              >
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+              {/* Clear */}
+              <button
+                onClick={clearCanvas}
+                className="p-3 rounded-xl bg-red-600 hover:bg-red-700 transition-all"
+                title="Очистить"
+              >
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              {/* Divider */}
+              <div className="h-px bg-white/20 my-1"></div>
+              {/* Colors */}
+              {['#ffffff', '#ef4444', '#22c55e', '#3b82f6', '#eab308', '#a855f7'].map(color => (
+                <button
+                  key={color}
+                  onClick={() => { setBrushColor(color); setTool('pen'); }}
+                  className={`w-8 h-8 rounded-full border-2 transition-all ${brushColor === color && tool === 'pen' ? 'border-white scale-110' : 'border-transparent'}`}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+              {/* Divider */}
+              <div className="h-px bg-white/20 my-1"></div>
+              {/* Brush Size */}
+              <input
+                type="range"
+                min="1"
+                max="20"
+                value={brushSize}
+                onChange={(e) => setBrushSize(Number(e.target.value))}
+                className="w-full accent-indigo-500"
+              />
+            </div>
+
+            {/* Small Cameras in Top Right Corner */}
+            <div className="absolute top-4 right-4 z-20 flex gap-2">
+              {/* My Camera */}
+              <div className="w-32 h-24 bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-white/20">
+                <video
+                  ref={mySmallCameraRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover mirror"
+                />
+              </div>
+              {/* Remote Camera */}
+              <div className="w-32 h-24 bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-white/20">
+                <video
+                  ref={remoteSmallCameraRef}
+                  autoPlay
+                  playsInline
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+          </>
+        ) : (isScreenSharing || remoteScreenSharing) && isConnected ? (
           // Screen Sharing Layout - Screen fullscreen, cameras in top right corner
           <>
             {/* Screen Share Video - Fullscreen */}
@@ -1271,6 +1524,20 @@ const VideoCall = () => {
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </button>
+
+          <button
+            onClick={toggleWhiteboard}
+            className={`group relative p-4 rounded-2xl transition-all duration-200 ${
+              isWhiteboardActive
+                ? 'bg-gradient-to-br from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-lg shadow-green-500/50'
+                : 'bg-gradient-to-br from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 shadow-lg'
+            } text-white active:scale-95`}
+            title={isWhiteboardActive ? 'Закрыть доску' : 'Открыть доску'}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
             </svg>
           </button>
 
