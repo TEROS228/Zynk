@@ -110,21 +110,20 @@ const VideoCall = () => {
     const isSpecialMode = (isScreenSharing || remoteScreenSharing) || (isWhiteboardActive || remoteWhiteboardActive);
 
     if (isSpecialMode && isConnected) {
-      // Set my camera to small camera ref (always my camera stream)
-      if (mySmallCameraRef.current && myStreamRef.current) {
+      // Set my camera to small camera ref (always my camera stream - NOT screen)
+      if (mySmallCameraRef.current && myStreamRef.current && mySmallCameraRef.current.srcObject !== myStreamRef.current) {
         mySmallCameraRef.current.srcObject = myStreamRef.current;
       }
-      // Set remote camera to small camera ref
-      if (remoteSmallCameraRef.current && remoteStreamRef.current) {
+      // Set remote camera to small camera ref (their camera or screen depending on what they're sharing)
+      if (remoteSmallCameraRef.current && remoteStreamRef.current && remoteSmallCameraRef.current.srcObject !== remoteStreamRef.current) {
         remoteSmallCameraRef.current.srcObject = remoteStreamRef.current;
       }
       // Set screen video ref for screen sharing (my local screen)
-      if (isScreenSharing && screenVideoRef.current && screenStreamRef.current) {
+      if (isScreenSharing && screenVideoRef.current && screenStreamRef.current && screenVideoRef.current.srcObject !== screenStreamRef.current) {
         screenVideoRef.current.srcObject = screenStreamRef.current;
       }
-      // When remote is sharing, their stream (remoteStreamRef) already contains the screen
-      // because they replaced their video track with replaceTrack
-      if (remoteScreenSharing && remoteVideoRef.current && remoteStreamRef.current) {
+      // When remote is sharing, show their screen in the main video
+      if (remoteScreenSharing && remoteVideoRef.current && remoteStreamRef.current && remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
         remoteVideoRef.current.srcObject = remoteStreamRef.current;
       }
     } else if (isConnected && !isSpecialMode) {
@@ -1202,35 +1201,48 @@ const VideoCall = () => {
     if (!canvas || !ctx) return;
 
     if (data.drawing) {
-      // Convert world coordinates to screen coordinates
-      const x = data.x + canvasOffset.x;
-      const y = data.y + canvasOffset.y;
-
-      // Track remote stroke
+      // Track remote stroke using world coordinates only
       if (!remoteStrokeRef.current) {
         remoteStrokeRef.current = {
           color: data.color,
           size: data.size,
           points: [{ x: data.x, y: data.y }],
-          lastScreenX: x,
-          lastScreenY: y
+          lastWorldX: data.x,
+          lastWorldY: data.y
         };
       } else {
-        // Draw line from last point to current point (separate from local drawing)
-        ctx.save();
-        ctx.beginPath();
-        ctx.strokeStyle = data.color;
-        ctx.lineWidth = data.size;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.moveTo(remoteStrokeRef.current.lastScreenX, remoteStrokeRef.current.lastScreenY);
-        ctx.lineTo(x, y);
-        ctx.stroke();
-        ctx.restore();
+        // Calculate screen coordinates from world coordinates using current offset
+        // This ensures correct positioning even if local user panned
+        const lastScreenX = remoteStrokeRef.current.lastWorldX + canvasOffset.x;
+        const lastScreenY = remoteStrokeRef.current.lastWorldY + canvasOffset.y;
+        const currentScreenX = data.x + canvasOffset.x;
+        const currentScreenY = data.y + canvasOffset.y;
+
+        // Only draw if the line segment is visible on screen
+        const isVisible = (
+          (lastScreenX >= -100 && lastScreenX <= canvas.width + 100) ||
+          (currentScreenX >= -100 && currentScreenX <= canvas.width + 100)
+        ) && (
+          (lastScreenY >= -100 && lastScreenY <= canvas.height + 100) ||
+          (currentScreenY >= -100 && currentScreenY <= canvas.height + 100)
+        );
+
+        if (isVisible) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.strokeStyle = data.color;
+          ctx.lineWidth = data.size;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.moveTo(lastScreenX, lastScreenY);
+          ctx.lineTo(currentScreenX, currentScreenY);
+          ctx.stroke();
+          ctx.restore();
+        }
 
         remoteStrokeRef.current.points.push({ x: data.x, y: data.y });
-        remoteStrokeRef.current.lastScreenX = x;
-        remoteStrokeRef.current.lastScreenY = y;
+        remoteStrokeRef.current.lastWorldX = data.x;
+        remoteStrokeRef.current.lastWorldY = data.y;
       }
     } else {
       // Save remote stroke
@@ -1665,7 +1677,7 @@ const VideoCall = () => {
             )}
           </>
         ) : (isScreenSharing || remoteScreenSharing) && isConnected ? (
-          // Screen Sharing Layout - Screen fullscreen, cameras in top right corner
+          // Screen Sharing Layout - Screen fullscreen, cameras in corner
           <>
             {/* Screen Share Video - Fullscreen */}
             <div className="absolute inset-0 bg-black flex items-center justify-center overflow-hidden">
@@ -1678,7 +1690,7 @@ const VideoCall = () => {
                   className="w-full h-full object-contain"
                 />
               ) : (
-                // Remote is sharing - show their video stream (which now contains screen)
+                // Remote is sharing - show their stream (which now contains screen via replaceTrack)
                 <video
                   ref={remoteVideoRef}
                   autoPlay
@@ -1688,10 +1700,9 @@ const VideoCall = () => {
               )}
             </div>
 
-            {/* Small Cameras in Top Right Corner */}
-            <div className="absolute top-4 right-4 z-20 flex gap-2">
-              {/* My Camera - always shows my camera stream */}
-              <div className="w-32 h-24 bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-white/20 relative">
+            {/* Small Camera in Top Right Corner - only show MY camera */}
+            <div className="absolute top-4 right-4 z-20">
+              <div className="w-40 h-28 bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-white/20 relative">
                 <video
                   ref={mySmallCameraRef}
                   autoPlay
@@ -1701,18 +1712,6 @@ const VideoCall = () => {
                 />
                 <div className="absolute bottom-1 left-1 px-2 py-0.5 bg-black/70 rounded text-white text-xs">
                   {userName}
-                </div>
-              </div>
-              {/* Remote Camera - shows their camera (but during their screen share, this shows their screen) */}
-              <div className="w-32 h-24 bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-white/20 relative">
-                <video
-                  ref={remoteSmallCameraRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute bottom-1 left-1 px-2 py-0.5 bg-black/70 rounded text-white text-xs">
-                  Partner
                 </div>
               </div>
             </div>
