@@ -30,7 +30,7 @@ const VideoCall = () => {
   const [remoteScreenSharing, setRemoteScreenSharing] = useState(false);
   const [isWhiteboardActive, setIsWhiteboardActive] = useState(false);
   const [remoteWhiteboardActive, setRemoteWhiteboardActive] = useState(false);
-  const [brushColor, setBrushColor] = useState('#ffffff');
+  const [brushColor, setBrushColor] = useState('#000000');
   const [brushSize, setBrushSize] = useState(3);
   const [tool, setTool] = useState('pen'); // pen, eraser
   const [isDrawing, setIsDrawing] = useState(false);
@@ -420,13 +420,7 @@ const VideoCall = () => {
             } else if (data.type === 'whiteboard-draw') {
               handleRemoteDrawing(data);
             } else if (data.type === 'whiteboard-clear') {
-              const canvas = canvasRef.current;
-              const ctx = ctxRef.current;
-              if (canvas && ctx) {
-                ctx.fillStyle = '#1a1a2e';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.beginPath();
-              }
+              initCanvas();
             }
           });
         });
@@ -609,13 +603,7 @@ const VideoCall = () => {
                 } else if (data.type === 'whiteboard-draw') {
                   handleRemoteDrawing(data);
                 } else if (data.type === 'whiteboard-clear') {
-                  const canvas = canvasRef.current;
-                  const ctx = ctxRef.current;
-                  if (canvas && ctx) {
-                    ctx.fillStyle = '#1a1a2e';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    ctx.beginPath();
-                  }
+                  initCanvas();
                 }
               });
             });
@@ -885,8 +873,32 @@ const VideoCall = () => {
     canvas.height = canvas.offsetHeight;
 
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#1a1a2e';
+
+    // White background
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw grid
+    ctx.strokeStyle = '#e5e7eb';
+    ctx.lineWidth = 1;
+    const gridSize = 30;
+
+    // Vertical lines
+    for (let x = 0; x <= canvas.width; x += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+
+    // Horizontal lines
+    for (let y = 0; y <= canvas.height; y += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctxRef.current = ctx;
@@ -916,7 +928,7 @@ const VideoCall = () => {
     const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
     const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top;
 
-    ctx.strokeStyle = tool === 'eraser' ? '#1a1a2e' : brushColor;
+    ctx.strokeStyle = tool === 'eraser' ? '#ffffff' : brushColor;
     ctx.lineWidth = tool === 'eraser' ? brushSize * 3 : brushSize;
     ctx.lineTo(x, y);
     ctx.stroke();
@@ -927,7 +939,7 @@ const VideoCall = () => {
         type: 'whiteboard-draw',
         x: x / canvas.width,
         y: y / canvas.height,
-        color: tool === 'eraser' ? '#1a1a2e' : brushColor,
+        color: tool === 'eraser' ? '#ffffff' : brushColor,
         size: tool === 'eraser' ? brushSize * 3 : brushSize,
         drawing: true
       });
@@ -967,8 +979,29 @@ const VideoCall = () => {
     const ctx = ctxRef.current;
     if (!canvas || !ctx) return;
 
-    ctx.fillStyle = '#1a1a2e';
+    // White background
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Redraw grid
+    ctx.strokeStyle = '#e5e7eb';
+    ctx.lineWidth = 1;
+    const gridSize = 30;
+
+    for (let x = 0; x <= canvas.width; x += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+
+    for (let y = 0; y <= canvas.height; y += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+
     ctx.beginPath();
 
     // Notify remote
@@ -1219,7 +1252,7 @@ const VideoCall = () => {
               {/* Divider */}
               <div className="h-px bg-white/20 my-1"></div>
               {/* Colors */}
-              {['#ffffff', '#ef4444', '#22c55e', '#3b82f6', '#eab308', '#a855f7'].map(color => (
+              {['#000000', '#ef4444', '#22c55e', '#3b82f6', '#eab308', '#a855f7'].map(color => (
                 <button
                   key={color}
                   onClick={() => { setBrushColor(color); setTool('pen'); }}
