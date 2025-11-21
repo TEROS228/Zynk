@@ -53,6 +53,7 @@ const VideoCall = () => {
   const remoteSmallCameraRef = useRef(null);
   const peerRef = useRef(null);
   const myStreamRef = useRef(null);
+  const remoteStreamRef = useRef(null);
   const screenStreamRef = useRef(null);
   const callRef = useRef(null);
   const dataConnRef = useRef(null);
@@ -104,8 +105,8 @@ const VideoCall = () => {
         mySmallCameraRef.current.srcObject = myStreamRef.current;
       }
       // Set remote camera to small camera ref
-      if (remoteSmallCameraRef.current && remoteVideoRef.current && remoteVideoRef.current.srcObject) {
-        remoteSmallCameraRef.current.srcObject = remoteVideoRef.current.srcObject;
+      if (remoteSmallCameraRef.current && remoteStreamRef.current) {
+        remoteSmallCameraRef.current.srcObject = remoteStreamRef.current;
       }
     }
   }, [isScreenSharing, remoteScreenSharing, isWhiteboardActive, remoteWhiteboardActive, isConnected]);
@@ -114,30 +115,46 @@ const VideoCall = () => {
   useEffect(() => {
     if (!isMobile) return; // Skip for desktop layout
 
-    console.log('>>> useEffect: Syncing video streams (mobile)');
-    console.log('>>> isConnected:', isConnected);
-    console.log('>>> isMyVideoLarge:', isMyVideoLarge);
-
-    if (largeVideoRef.current) {
-      if (!isConnected && myVideoRef.current) {
-        largeVideoRef.current.srcObject = myVideoRef.current.srcObject;
+    if (largeVideoRef.current && myStreamRef.current) {
+      if (!isConnected) {
+        largeVideoRef.current.srcObject = myStreamRef.current;
       } else if (isConnected) {
-        if (isMyVideoLarge && myVideoRef.current) {
-          largeVideoRef.current.srcObject = myVideoRef.current.srcObject;
-        } else if (!isMyVideoLarge && remoteVideoRef.current) {
-          largeVideoRef.current.srcObject = remoteVideoRef.current.srcObject;
+        if (isMyVideoLarge) {
+          largeVideoRef.current.srcObject = myStreamRef.current;
+        } else if (remoteStreamRef.current) {
+          largeVideoRef.current.srcObject = remoteStreamRef.current;
         }
       }
     }
 
     if (smallVideoRef.current && isConnected) {
-      if (isMyVideoLarge && remoteVideoRef.current) {
-        smallVideoRef.current.srcObject = remoteVideoRef.current.srcObject;
-      } else if (!isMyVideoLarge && myVideoRef.current) {
-        smallVideoRef.current.srcObject = myVideoRef.current.srcObject;
+      if (isMyVideoLarge && remoteStreamRef.current) {
+        smallVideoRef.current.srcObject = remoteStreamRef.current;
+      } else if (!isMyVideoLarge && myStreamRef.current) {
+        smallVideoRef.current.srcObject = myStreamRef.current;
       }
     }
   }, [isConnected, isMyVideoLarge, isMobile]);
+
+  // Sync video streams for desktop
+  useEffect(() => {
+    if (isMobile) return; // Skip for mobile
+
+    // Set my video stream
+    if (myVideoRef.current && myStreamRef.current) {
+      myVideoRef.current.srcObject = myStreamRef.current;
+    }
+
+    // Set remote video stream
+    if (remoteVideoRef.current && remoteStreamRef.current && isConnected) {
+      remoteVideoRef.current.srcObject = remoteStreamRef.current;
+    }
+
+    // Set large video when waiting
+    if (largeVideoRef.current && myStreamRef.current && !isConnected) {
+      largeVideoRef.current.srcObject = myStreamRef.current;
+    }
+  }, [isConnected, isMobile]);
 
   // Monitor connection quality
   useEffect(() => {
@@ -376,8 +393,11 @@ const VideoCall = () => {
 
           call.on('stream', (remoteStream) => {
             console.log('>>> HOST: Received remote stream!');
-            if (mounted && remoteVideoRef.current) {
-              remoteVideoRef.current.srcObject = remoteStream;
+            if (mounted) {
+              remoteStreamRef.current = remoteStream;
+              if (remoteVideoRef.current) {
+                remoteVideoRef.current.srcObject = remoteStream;
+              }
               setIsConnected(true);
               console.log('>>> HOST: Connection established!');
             }
@@ -568,8 +588,11 @@ const VideoCall = () => {
 
               call.on('stream', (remoteStream) => {
                 console.log('>>> PARTICIPANT: Received remote stream!');
-                if (mounted && remoteVideoRef.current) {
-                  remoteVideoRef.current.srcObject = remoteStream;
+                if (mounted) {
+                  remoteStreamRef.current = remoteStream;
+                  if (remoteVideoRef.current) {
+                    remoteVideoRef.current.srcObject = remoteStream;
+                  }
                   setIsConnected(true);
                   console.log('>>> PARTICIPANT: Connection established!');
                 }
@@ -668,17 +691,13 @@ const VideoCall = () => {
 
           call.on('stream', (remoteStream) => {
             console.log('>>> attemptConnection: Received remote stream!');
-            console.log('>>> attemptConnection: remoteVideoRef.current:', remoteVideoRef.current);
-            console.log('>>> attemptConnection: mounted:', mounted);
-            console.log('>>> attemptConnection: remoteStream:', remoteStream);
-
-            if (remoteVideoRef.current && mounted) {
-              console.log('>>> attemptConnection: Setting srcObject...');
-              remoteVideoRef.current.srcObject = remoteStream;
+            if (mounted) {
+              remoteStreamRef.current = remoteStream;
+              if (remoteVideoRef.current) {
+                remoteVideoRef.current.srcObject = remoteStream;
+              }
               setIsConnected(true);
-              console.log('>>> attemptConnection: Video connected! isConnected set to true');
-            } else {
-              console.log('>>> attemptConnection: FAILED - remoteVideoRef.current is null or not mounted');
+              console.log('>>> attemptConnection: Video connected!');
             }
           });
 
@@ -1264,9 +1283,6 @@ const VideoCall = () => {
       onTouchMove={handleTouchMove}
       onTouchEnd={handleMouseUp}
     >
-      {/* Hidden video elements - always render for desktop refs */}
-      <video ref={myVideoRef} autoPlay muted playsInline style={{ display: 'none' }} />
-      <video ref={remoteVideoRef} autoPlay playsInline style={{ display: 'none' }} />
 
       {/* Header */}
       <div className={`absolute top-0 left-0 right-0 z-50 px-6 py-4 flex items-center justify-between transition-transform duration-300 ${showControls ? 'translate-y-0' : '-translate-y-full'}`}>
