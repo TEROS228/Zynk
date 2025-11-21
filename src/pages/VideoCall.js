@@ -12,7 +12,10 @@ const VideoCall = () => {
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [error, setError] = useState(null);
   const [isMyVideoLarge, setIsMyVideoLarge] = useState(false);
-  const [smallVideoPosition, setSmallVideoPosition] = useState({ x: 16, y: 16 });
+  const [smallVideoPosition, setSmallVideoPosition] = useState(() => {
+    const saved = localStorage.getItem('smallVideoPosition');
+    return saved ? JSON.parse(saved) : { x: 16, y: 16 };
+  });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isHost, setIsHost] = useState(false);
@@ -74,6 +77,11 @@ const VideoCall = () => {
 
     checkMobile();
   }, []);
+
+  // Save small video position to localStorage
+  useEffect(() => {
+    localStorage.setItem('smallVideoPosition', JSON.stringify(smallVideoPosition));
+  }, [smallVideoPosition]);
 
   // Show controls when cursor is at top or bottom of screen
   useEffect(() => {
@@ -140,21 +148,32 @@ const VideoCall = () => {
   useEffect(() => {
     if (isMobile) return; // Skip for mobile
 
-    // Set my video stream
-    if (myVideoRef.current && myStreamRef.current) {
-      myVideoRef.current.srcObject = myStreamRef.current;
+    if (!isConnected) {
+      // Waiting state - show my video in large view
+      if (largeVideoRef.current && myStreamRef.current) {
+        largeVideoRef.current.srcObject = myStreamRef.current;
+      }
+    } else {
+      // Connected state - swap based on isMyVideoLarge
+      if (isMyVideoLarge) {
+        // My video is large, remote is small
+        if (myVideoRef.current && myStreamRef.current) {
+          myVideoRef.current.srcObject = myStreamRef.current;
+        }
+        if (remoteVideoRef.current && remoteStreamRef.current) {
+          remoteVideoRef.current.srcObject = remoteStreamRef.current;
+        }
+      } else {
+        // Remote video is large, my video is small
+        if (remoteVideoRef.current && remoteStreamRef.current) {
+          remoteVideoRef.current.srcObject = remoteStreamRef.current;
+        }
+        if (myVideoRef.current && myStreamRef.current) {
+          myVideoRef.current.srcObject = myStreamRef.current;
+        }
+      }
     }
-
-    // Set remote video stream
-    if (remoteVideoRef.current && remoteStreamRef.current && isConnected) {
-      remoteVideoRef.current.srcObject = remoteStreamRef.current;
-    }
-
-    // Set large video when waiting
-    if (largeVideoRef.current && myStreamRef.current && !isConnected) {
-      largeVideoRef.current.srcObject = myStreamRef.current;
-    }
-  }, [isConnected, isMobile]);
+  }, [isConnected, isMobile, isMyVideoLarge]);
 
   // Monitor connection quality
   useEffect(() => {
@@ -1201,8 +1220,10 @@ const VideoCall = () => {
   const handleMouseDown = (e) => {
     setDragStartTime(Date.now());
     setIsDragging(true);
+    // For desktop (right-based positioning), calculate from right edge
+    const rightPos = window.innerWidth - e.clientX - (isMobile ? 0 : 256); // 256 = video width on desktop
     setDragOffset({
-      x: e.clientX - smallVideoPosition.x,
+      x: isMobile ? e.clientX - smallVideoPosition.x : rightPos - smallVideoPosition.x,
       y: e.clientY - smallVideoPosition.y
     });
   };
@@ -1213,10 +1234,19 @@ const VideoCall = () => {
         cancelAnimationFrame(dragAnimationFrameRef.current);
       }
       dragAnimationFrameRef.current = requestAnimationFrame(() => {
-        setSmallVideoPosition({
-          x: e.clientX - dragOffset.x,
-          y: e.clientY - dragOffset.y
-        });
+        if (isMobile) {
+          setSmallVideoPosition({
+            x: e.clientX - dragOffset.x,
+            y: e.clientY - dragOffset.y
+          });
+        } else {
+          // Desktop: position from right edge
+          const rightPos = window.innerWidth - e.clientX - 256;
+          setSmallVideoPosition({
+            x: Math.max(16, rightPos - dragOffset.x),
+            y: Math.max(80, e.clientY - dragOffset.y) // 80 to stay below header
+          });
+        }
       });
     }
   };
@@ -1232,8 +1262,9 @@ const VideoCall = () => {
     const touch = e.touches[0];
     setDragStartTime(Date.now());
     setIsDragging(true);
+    const rightPos = window.innerWidth - touch.clientX - (isMobile ? 0 : 256);
     setDragOffset({
-      x: touch.clientX - smallVideoPosition.x,
+      x: isMobile ? touch.clientX - smallVideoPosition.x : rightPos - smallVideoPosition.x,
       y: touch.clientY - smallVideoPosition.y
     });
   };
@@ -1245,10 +1276,18 @@ const VideoCall = () => {
         cancelAnimationFrame(dragAnimationFrameRef.current);
       }
       dragAnimationFrameRef.current = requestAnimationFrame(() => {
-        setSmallVideoPosition({
-          x: touch.clientX - dragOffset.x,
-          y: touch.clientY - dragOffset.y
-        });
+        if (isMobile) {
+          setSmallVideoPosition({
+            x: touch.clientX - dragOffset.x,
+            y: touch.clientY - dragOffset.y
+          });
+        } else {
+          const rightPos = window.innerWidth - touch.clientX - 256;
+          setSmallVideoPosition({
+            x: Math.max(16, rightPos - dragOffset.x),
+            y: Math.max(80, touch.clientY - dragOffset.y)
+          });
+        }
       });
     }
   };
@@ -1719,49 +1758,86 @@ const VideoCall = () => {
                 <div className="absolute bottom-0 right-0 w-32 h-32 bg-gradient-to-tl from-purple-500/20 to-transparent rounded-tl-full pointer-events-none"></div>
               </div>
             ) : (
-              // Connected state - two equal videos side by side
-              <div className="absolute inset-0 grid grid-cols-2 gap-0">
-                {/* My Video */}
-                <div className="relative bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10"></div>
+              // Connected state - fullscreen + small video in corner (like mobile)
+              <>
+                {/* Large Video - Fullscreen */}
+                <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10 animate-gradient"></div>
 
                   <video
-                    ref={myVideoRef}
+                    ref={isMyVideoLarge ? myVideoRef : remoteVideoRef}
                     autoPlay
-                    muted
+                    muted={isMyVideoLarge}
                     playsInline
-                    className="relative z-10 w-full h-full object-cover mirror"
+                    className={`relative z-10 w-full h-full object-cover ${isMyVideoLarge ? 'mirror' : ''}`}
                   />
 
                   {/* Name badge */}
-                  <div className="absolute bottom-4 left-4 right-4 px-4 py-2 bg-gradient-to-r from-black/80 to-black/60 backdrop-blur-xl rounded-xl border border-white/20 shadow-lg">
-                    <p className="text-white font-semibold text-sm truncate">{userName}</p>
+                  <div className="absolute bottom-24 left-4 px-4 py-2 bg-gradient-to-r from-black/80 to-black/60 backdrop-blur-xl rounded-xl border border-white/20 shadow-lg">
+                    <p className="text-white font-semibold text-sm truncate">{isMyVideoLarge ? userName : 'Partner'}</p>
                   </div>
 
                   {/* Corner decoration */}
-                  <div className="absolute top-0 left-0 w-24 h-24 bg-gradient-to-br from-indigo-500/20 to-transparent rounded-br-full pointer-events-none"></div>
+                  <div className="absolute top-0 left-0 w-32 h-32 bg-gradient-to-br from-indigo-500/20 to-transparent rounded-br-full pointer-events-none"></div>
+                  <div className="absolute bottom-0 right-0 w-32 h-32 bg-gradient-to-tl from-purple-500/20 to-transparent rounded-tl-full pointer-events-none"></div>
                 </div>
 
-                {/* Remote Video */}
-                <div className="relative bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-indigo-500/10"></div>
-
+                {/* Small Video (draggable & clickable) */}
+                <div
+                  style={{
+                    right: `${smallVideoPosition.x}px`,
+                    top: `${smallVideoPosition.y}px`,
+                    transition: isDragging ? 'none' : 'all 0.3s ease-out',
+                  }}
+                  onMouseDown={handleMouseDown}
+                  onTouchStart={handleTouchStart}
+                  onClick={(e) => {
+                    const clickDuration = Date.now() - dragStartTime;
+                    if (clickDuration < 200) {
+                      switchVideo();
+                    }
+                  }}
+                  className={`absolute w-64 h-48 bg-gradient-to-br from-gray-900 via-black to-gray-900 rounded-2xl overflow-hidden z-20 ${
+                    isDragging
+                      ? 'cursor-grabbing scale-105 border-4 border-indigo-500 shadow-[0_20px_60px_-15px_rgba(99,102,241,0.6)]'
+                      : 'cursor-grab border-2 border-white/20 hover:border-indigo-400/60 shadow-2xl hover:shadow-[0_20px_60px_-15px_rgba(99,102,241,0.4)] hover:scale-105'
+                  }`}
+                >
                   <video
-                    ref={remoteVideoRef}
+                    ref={isMyVideoLarge ? remoteVideoRef : myVideoRef}
                     autoPlay
+                    muted={!isMyVideoLarge}
                     playsInline
-                    className="relative z-10 w-full h-full object-cover"
+                    className={`w-full h-full object-cover ${!isMyVideoLarge ? 'mirror' : ''}`}
                   />
 
+                  {/* Gradient overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none"></div>
+
                   {/* Name badge */}
-                  <div className="absolute bottom-4 left-4 right-4 px-4 py-2 bg-gradient-to-r from-black/80 to-black/60 backdrop-blur-xl rounded-xl border border-white/20 shadow-lg">
-                    <p className="text-white font-semibold text-sm truncate">Partner</p>
+                  <div className="absolute bottom-3 left-3 right-3 px-3 py-2 bg-gradient-to-r from-black/80 to-black/60 backdrop-blur-xl rounded-xl border border-white/20 shadow-lg">
+                    <p className="text-white font-semibold text-xs truncate">{isMyVideoLarge ? 'Partner' : userName}</p>
                   </div>
 
-                  {/* Corner decoration */}
-                  <div className="absolute bottom-0 right-0 w-24 h-24 bg-gradient-to-tl from-purple-500/20 to-transparent rounded-tl-full pointer-events-none"></div>
+                  {/* Drag indicator */}
+                  <div className="absolute top-3 left-3 flex gap-2">
+                    <div className="bg-black/60 backdrop-blur-xl rounded-full p-2 border border-white/20 shadow-lg">
+                      <svg className="w-4 h-4 text-white/80" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M9 3h2v2H9V3zm4 0h2v2h-2V3zM9 7h2v2H9V7zm4 0h2v2h-2V7zm-4 4h2v2H9v-2zm4 0h2v2h-2v-2zm-4 4h2v2H9v-2zm4 0h2v2h-2v-2zm-4 4h2v2H9v-2zm4 0h2v2h-2v-2z" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* Switch indicator */}
+                  <div className="absolute top-3 right-3">
+                    <div className="bg-gradient-to-br from-indigo-500/80 to-purple-500/80 backdrop-blur-xl rounded-full p-2 border border-white/30 shadow-lg">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                      </svg>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </>
             )}
           </>
         )}
