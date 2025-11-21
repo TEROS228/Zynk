@@ -34,10 +34,17 @@ const VideoCall = () => {
   const [brushSize, setBrushSize] = useState(3);
   const [tool, setTool] = useState('pen'); // pen, eraser
   const [isDrawing, setIsDrawing] = useState(false);
+  const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [remoteCursor, setRemoteCursor] = useState({ x: 0, y: 0, visible: false, name: '' });
 
   const myVideoRef = useRef(null);
   const canvasRef = useRef(null);
+  const gridCanvasRef = useRef(null);
   const ctxRef = useRef(null);
+  const gridCtxRef = useRef(null);
+  const drawingDataRef = useRef([]); // Store all drawing strokes
   const remoteVideoRef = useRef(null);
   const largeVideoRef = useRef(null);
   const smallVideoRef = useRef(null);
@@ -420,7 +427,12 @@ const VideoCall = () => {
             } else if (data.type === 'whiteboard-draw') {
               handleRemoteDrawing(data);
             } else if (data.type === 'whiteboard-clear') {
-              initCanvas();
+              drawingDataRef.current = [];
+              if (ctxRef.current && canvasRef.current) {
+                ctxRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+              }
+            } else if (data.type === 'cursor-position') {
+              handleRemoteCursor(data);
             }
           });
         });
@@ -603,7 +615,12 @@ const VideoCall = () => {
                 } else if (data.type === 'whiteboard-draw') {
                   handleRemoteDrawing(data);
                 } else if (data.type === 'whiteboard-clear') {
-                  initCanvas();
+                  drawingDataRef.current = [];
+                  if (ctxRef.current && canvasRef.current) {
+                    ctxRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+                  }
+                } else if (data.type === 'cursor-position') {
+                  handleRemoteCursor(data);
                 }
               });
             });
@@ -866,79 +883,175 @@ const VideoCall = () => {
 
   const initCanvas = () => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const gridCanvas = gridCanvasRef.current;
+    if (!canvas || !gridCanvas) return;
 
     // Set canvas size to fill container
     canvas.width = canvas.offsetWidth;
     canvas.height = canvas.offsetHeight;
+    gridCanvas.width = gridCanvas.offsetWidth;
+    gridCanvas.height = gridCanvas.offsetHeight;
 
     const ctx = canvas.getContext('2d');
+    const gridCtx = gridCanvas.getContext('2d');
 
-    // White background
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Draw grid
-    ctx.strokeStyle = '#e5e7eb';
-    ctx.lineWidth = 1;
-    const gridSize = 30;
-
-    // Vertical lines
-    for (let x = 0; x <= canvas.width; x += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, canvas.height);
-      ctx.stroke();
-    }
-
-    // Horizontal lines
-    for (let y = 0; y <= canvas.height; y += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(canvas.width, y);
-      ctx.stroke();
-    }
-
+    // Clear drawing canvas (transparent)
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctxRef.current = ctx;
+    gridCtxRef.current = gridCtx;
+
+    // Draw grid on grid canvas
+    drawGrid();
+
+    // Redraw all stored strokes
+    redrawAllStrokes();
   };
 
+  const drawGrid = () => {
+    const gridCanvas = gridCanvasRef.current;
+    const gridCtx = gridCtxRef.current;
+    if (!gridCanvas || !gridCtx) return;
+
+    // White background
+    gridCtx.fillStyle = '#ffffff';
+    gridCtx.fillRect(0, 0, gridCanvas.width, gridCanvas.height);
+
+    // Draw grid with offset
+    gridCtx.strokeStyle = '#e5e7eb';
+    gridCtx.lineWidth = 1;
+    const gridSize = 30;
+
+    const offsetX = canvasOffset.x % gridSize;
+    const offsetY = canvasOffset.y % gridSize;
+
+    // Vertical lines
+    for (let x = offsetX; x <= gridCanvas.width; x += gridSize) {
+      gridCtx.beginPath();
+      gridCtx.moveTo(x, 0);
+      gridCtx.lineTo(x, gridCanvas.height);
+      gridCtx.stroke();
+    }
+
+    // Horizontal lines
+    for (let y = offsetY; y <= gridCanvas.height; y += gridSize) {
+      gridCtx.beginPath();
+      gridCtx.moveTo(0, y);
+      gridCtx.lineTo(gridCanvas.width, y);
+      gridCtx.stroke();
+    }
+  };
+
+  const redrawAllStrokes = () => {
+    const canvas = canvasRef.current;
+    const ctx = ctxRef.current;
+    if (!canvas || !ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    drawingDataRef.current.forEach(stroke => {
+      if (stroke.points.length < 2) return;
+
+      ctx.strokeStyle = stroke.color;
+      ctx.lineWidth = stroke.size;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+
+      const firstPoint = stroke.points[0];
+      ctx.moveTo(firstPoint.x + canvasOffset.x, firstPoint.y + canvasOffset.y);
+
+      for (let i = 1; i < stroke.points.length; i++) {
+        const point = stroke.points[i];
+        ctx.lineTo(point.x + canvasOffset.x, point.y + canvasOffset.y);
+      }
+      ctx.stroke();
+    });
+  };
+
+  const currentStrokeRef = useRef(null);
+  const remoteStrokeRef = useRef(null);
+
   const startDrawing = (e) => {
+    // Check if middle mouse button, shift is held, or pan tool selected
+    if (e.button === 1 || e.shiftKey || tool === 'pan') {
+      startPanning(e);
+      return;
+    }
+
     const canvas = canvasRef.current;
     const ctx = ctxRef.current;
     if (!canvas || !ctx) return;
 
     setIsDrawing(true);
     const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
-    const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top;
+    const clientX = e.clientX || e.touches?.[0]?.clientX;
+    const clientY = e.clientY || e.touches?.[0]?.clientY;
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+
+    // Store in world coordinates (without offset)
+    const worldX = x - canvasOffset.x;
+    const worldY = y - canvasOffset.y;
+
+    // Start new stroke
+    currentStrokeRef.current = {
+      color: tool === 'eraser' ? '#ffffff' : brushColor,
+      size: tool === 'eraser' ? brushSize * 3 : brushSize,
+      points: [{ x: worldX, y: worldY }]
+    };
 
     ctx.beginPath();
     ctx.moveTo(x, y);
+
+    // Send cursor position
+    if (dataConnRef.current) {
+      dataConnRef.current.send({
+        type: 'cursor-position',
+        x: worldX,
+        y: worldY,
+        name: userName
+      });
+    }
   };
 
   const draw = (e) => {
+    if (isPanning) {
+      handlePanning(e);
+      return;
+    }
+
     if (!isDrawing) return;
     const canvas = canvasRef.current;
     const ctx = ctxRef.current;
     if (!canvas || !ctx) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
-    const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top;
+    const clientX = e.clientX || e.touches?.[0]?.clientX;
+    const clientY = e.clientY || e.touches?.[0]?.clientY;
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+
+    // Store in world coordinates
+    const worldX = x - canvasOffset.x;
+    const worldY = y - canvasOffset.y;
+
+    if (currentStrokeRef.current) {
+      currentStrokeRef.current.points.push({ x: worldX, y: worldY });
+    }
 
     ctx.strokeStyle = tool === 'eraser' ? '#ffffff' : brushColor;
     ctx.lineWidth = tool === 'eraser' ? brushSize * 3 : brushSize;
     ctx.lineTo(x, y);
     ctx.stroke();
 
-    // Send drawing data to remote
+    // Send drawing data to remote (world coordinates)
     if (dataConnRef.current) {
       dataConnRef.current.send({
         type: 'whiteboard-draw',
-        x: x / canvas.width,
-        y: y / canvas.height,
+        x: worldX,
+        y: worldY,
         color: tool === 'eraser' ? '#ffffff' : brushColor,
         size: tool === 'eraser' ? brushSize * 3 : brushSize,
         drawing: true
@@ -947,14 +1060,50 @@ const VideoCall = () => {
   };
 
   const stopDrawing = () => {
+    if (isPanning) {
+      stopPanning();
+      return;
+    }
+
     setIsDrawing(false);
     if (ctxRef.current) {
       ctxRef.current.beginPath();
     }
+
+    // Save completed stroke
+    if (currentStrokeRef.current && currentStrokeRef.current.points.length > 1) {
+      drawingDataRef.current.push(currentStrokeRef.current);
+    }
+    currentStrokeRef.current = null;
+
     // Notify remote that stroke ended
     if (dataConnRef.current) {
       dataConnRef.current.send({ type: 'whiteboard-draw', drawing: false });
     }
+  };
+
+  const startPanning = (e) => {
+    setIsPanning(true);
+    const clientX = e.clientX || e.touches?.[0]?.clientX;
+    const clientY = e.clientY || e.touches?.[0]?.clientY;
+    setPanStart({ x: clientX - canvasOffset.x, y: clientY - canvasOffset.y });
+  };
+
+  const handlePanning = (e) => {
+    if (!isPanning) return;
+    const clientX = e.clientX || e.touches?.[0]?.clientX;
+    const clientY = e.clientY || e.touches?.[0]?.clientY;
+    const newOffset = {
+      x: clientX - panStart.x,
+      y: clientY - panStart.y
+    };
+    setCanvasOffset(newOffset);
+    drawGrid();
+    redrawAllStrokes();
+  };
+
+  const stopPanning = () => {
+    setIsPanning(false);
   };
 
   const handleRemoteDrawing = (data) => {
@@ -963,15 +1112,49 @@ const VideoCall = () => {
     if (!canvas || !ctx) return;
 
     if (data.drawing) {
-      const x = data.x * canvas.width;
-      const y = data.y * canvas.height;
+      // Convert world coordinates to screen coordinates
+      const x = data.x + canvasOffset.x;
+      const y = data.y + canvasOffset.y;
+
+      // Track remote stroke
+      if (!remoteStrokeRef.current) {
+        remoteStrokeRef.current = {
+          color: data.color,
+          size: data.size,
+          points: []
+        };
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+      }
+
+      remoteStrokeRef.current.points.push({ x: data.x, y: data.y });
+
       ctx.strokeStyle = data.color;
       ctx.lineWidth = data.size;
       ctx.lineTo(x, y);
       ctx.stroke();
     } else {
       ctx.beginPath();
+      // Save remote stroke
+      if (remoteStrokeRef.current && remoteStrokeRef.current.points.length > 1) {
+        drawingDataRef.current.push(remoteStrokeRef.current);
+      }
+      remoteStrokeRef.current = null;
     }
+  };
+
+  const handleRemoteCursor = (data) => {
+    // Convert world coordinates to screen
+    const screenX = data.x + canvasOffset.x;
+    const screenY = data.y + canvasOffset.y;
+    setRemoteCursor({
+      x: screenX,
+      y: screenY,
+      worldX: data.x,
+      worldY: data.y,
+      visible: true,
+      name: data.name || 'Участник'
+    });
   };
 
   const clearCanvas = () => {
@@ -979,29 +1162,11 @@ const VideoCall = () => {
     const ctx = ctxRef.current;
     if (!canvas || !ctx) return;
 
-    // White background
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Clear all drawing data
+    drawingDataRef.current = [];
 
-    // Redraw grid
-    ctx.strokeStyle = '#e5e7eb';
-    ctx.lineWidth = 1;
-    const gridSize = 30;
-
-    for (let x = 0; x <= canvas.width; x += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, canvas.height);
-      ctx.stroke();
-    }
-
-    for (let y = 0; y <= canvas.height; y += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(canvas.width, y);
-      ctx.stroke();
-    }
-
+    // Clear only drawing canvas (grid stays on separate layer)
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.beginPath();
 
     // Notify remote
@@ -1202,11 +1367,17 @@ const VideoCall = () => {
         {(isWhiteboardActive || remoteWhiteboardActive) ? (
           // Whiteboard Layout - Canvas fullscreen, cameras in top right corner
           <>
-            {/* Whiteboard Canvas - Fullscreen */}
-            <div className="absolute inset-0 bg-[#1a1a2e] flex items-center justify-center overflow-hidden">
+            {/* Whiteboard Canvas - Fullscreen with two layers */}
+            <div className="absolute inset-0 overflow-hidden">
+              {/* Grid layer (background) */}
+              <canvas
+                ref={gridCanvasRef}
+                className="absolute inset-0 w-full h-full"
+              />
+              {/* Drawing layer (foreground) */}
               <canvas
                 ref={canvasRef}
-                className="w-full h-full cursor-crosshair"
+                className={`absolute inset-0 w-full h-full ${isPanning ? 'cursor-grabbing' : tool === 'pan' ? 'cursor-grab' : 'cursor-crosshair'}`}
                 onMouseDown={startDrawing}
                 onMouseMove={draw}
                 onMouseUp={stopDrawing}
@@ -1215,6 +1386,68 @@ const VideoCall = () => {
                 onTouchMove={draw}
                 onTouchEnd={stopDrawing}
               />
+
+              {/* Remote user cursor indicator */}
+              {remoteCursor.visible && isConnected && (() => {
+                const canvas = canvasRef.current;
+                if (!canvas) return null;
+
+                const screenX = remoteCursor.worldX + canvasOffset.x;
+                const screenY = remoteCursor.worldY + canvasOffset.y;
+                const isOffScreen = screenX < 0 || screenX > canvas.width || screenY < 0 || screenY > canvas.height;
+
+                if (isOffScreen) {
+                  // Calculate arrow direction
+                  const centerX = canvas.width / 2;
+                  const centerY = canvas.height / 2;
+                  const angle = Math.atan2(screenY - centerY, screenX - centerX);
+
+                  // Calculate position on edge
+                  const margin = 60;
+                  let arrowX = centerX + Math.cos(angle) * (centerX - margin);
+                  let arrowY = centerY + Math.sin(angle) * (centerY - margin);
+
+                  // Clamp to screen edges
+                  arrowX = Math.max(margin, Math.min(canvas.width - margin, arrowX));
+                  arrowY = Math.max(margin, Math.min(canvas.height - margin, arrowY));
+
+                  return (
+                    <div
+                      className="absolute z-20 flex items-center gap-2 animate-pulse"
+                      style={{ left: arrowX, top: arrowY, transform: 'translate(-50%, -50%)' }}
+                    >
+                      <div
+                        className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/50"
+                        style={{ transform: `rotate(${angle}rad)` }}
+                      >
+                        <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M10 17l5-5-5-5v10z" />
+                        </svg>
+                      </div>
+                      <span className="px-2 py-1 bg-gray-900/90 text-white text-xs font-semibold rounded-lg whitespace-nowrap">
+                        {remoteCursor.name}
+                      </span>
+                    </div>
+                  );
+                } else {
+                  // Show cursor on canvas
+                  return (
+                    <div
+                      className="absolute z-20 pointer-events-none transition-all duration-75"
+                      style={{ left: screenX, top: screenY, transform: 'translate(-50%, -50%)' }}
+                    >
+                      <div className="relative">
+                        <svg className="w-6 h-6 text-purple-500 drop-shadow-lg" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87c.48 0 .72-.58.38-.92L5.88 3.06c-.36-.35-.88-.13-.88.35z" />
+                        </svg>
+                        <span className="absolute left-6 top-4 px-2 py-0.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-semibold rounded-lg whitespace-nowrap shadow-lg">
+                          {remoteCursor.name}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }
+              })()}
             </div>
 
             {/* Whiteboard Tools */}
@@ -1237,6 +1470,16 @@ const VideoCall = () => {
               >
                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+              {/* Pan Tool */}
+              <button
+                onClick={() => setTool('pan')}
+                className={`p-3 rounded-xl transition-all ${tool === 'pan' ? 'bg-indigo-600' : 'bg-gray-700 hover:bg-gray-600'}`}
+                title="Перемещение (Shift+перетаскивание)"
+              >
+                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M10 7l1.44 1.44L7.88 12l3.56 3.56L10 17l-5-5 5-5zm4 0l5 5-5 5-1.44-1.44L16.12 12l-3.56-3.56L14 7z" />
                 </svg>
               </button>
               {/* Clear */}
@@ -1271,6 +1514,10 @@ const VideoCall = () => {
                 onChange={(e) => setBrushSize(Number(e.target.value))}
                 className="w-full accent-indigo-500"
               />
+              {/* Pan hint */}
+              <div className="text-[10px] text-gray-400 text-center mt-1">
+                Shift + тащить = перемещение
+              </div>
             </div>
 
             {/* Small Cameras in Top Right Corner - only show when connected */}
