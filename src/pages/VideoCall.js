@@ -26,13 +26,19 @@ const VideoCall = () => {
   });
   const [isMobile, setIsMobile] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [remoteScreenSharing, setRemoteScreenSharing] = useState(false);
 
   const myVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const largeVideoRef = useRef(null);
   const smallVideoRef = useRef(null);
+  const screenVideoRef = useRef(null);
+  const mySmallCameraRef = useRef(null);
+  const remoteSmallCameraRef = useRef(null);
   const peerRef = useRef(null);
   const myStreamRef = useRef(null);
+  const screenStreamRef = useRef(null);
   const callRef = useRef(null);
   const dataConnRef = useRef(null);
   const dragAnimationFrameRef = useRef(null);
@@ -74,6 +80,20 @@ const VideoCall = () => {
       window.removeEventListener('mousemove', handleMouseMove);
     };
   }, []);
+
+  // Sync video streams for screen sharing layout
+  useEffect(() => {
+    if ((isScreenSharing || remoteScreenSharing) && isConnected) {
+      // Set my camera to small camera ref
+      if (mySmallCameraRef.current && myStreamRef.current) {
+        mySmallCameraRef.current.srcObject = myStreamRef.current;
+      }
+      // Set remote camera to small camera ref
+      if (remoteSmallCameraRef.current && remoteVideoRef.current && remoteVideoRef.current.srcObject) {
+        remoteSmallCameraRef.current.srcObject = remoteVideoRef.current.srcObject;
+      }
+    }
+  }, [isScreenSharing, remoteScreenSharing, isConnected]);
 
   // Sync video streams to display elements (mobile only)
   useEffect(() => {
@@ -378,6 +398,12 @@ const VideoCall = () => {
                 peerRef.current.destroy();
               }
               navigate('/');
+            } else if (data.type === 'screen-share-start') {
+              console.log('>>> HOST: Participant started screen sharing');
+              setRemoteScreenSharing(true);
+            } else if (data.type === 'screen-share-stop') {
+              console.log('>>> HOST: Participant stopped screen sharing');
+              setRemoteScreenSharing(false);
             }
           });
         });
@@ -546,6 +572,12 @@ const VideoCall = () => {
                     peerRef.current.destroy();
                   }
                   navigate('/');
+                } else if (data.type === 'screen-share-start') {
+                  console.log('>>> PARTICIPANT: Host started screen sharing');
+                  setRemoteScreenSharing(true);
+                } else if (data.type === 'screen-share-stop') {
+                  console.log('>>> PARTICIPANT: Host stopped screen sharing');
+                  setRemoteScreenSharing(false);
                 }
               });
             });
@@ -718,6 +750,75 @@ const VideoCall = () => {
     const link = window.location.href;
     navigator.clipboard.writeText(link);
     alert('Ссылка скопирована! Отправьте её другому участнику.');
+  };
+
+  const startScreenShare = async () => {
+    try {
+      // Get screen stream with system dialog for selecting what to share
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          cursor: 'always',
+          displaySurface: 'monitor'
+        },
+        audio: false
+      });
+
+      screenStreamRef.current = screenStream;
+
+      // Set screen to video element
+      if (screenVideoRef.current) {
+        screenVideoRef.current.srcObject = screenStream;
+      }
+
+      // Replace video track in peer connection
+      if (callRef.current && callRef.current.peerConnection) {
+        const videoTrack = screenStream.getVideoTracks()[0];
+        const sender = callRef.current.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) {
+          sender.replaceTrack(videoTrack);
+        }
+      }
+
+      // Notify remote user that we're sharing screen
+      if (dataConnRef.current) {
+        dataConnRef.current.send({ type: 'screen-share-start' });
+      }
+
+      setIsScreenSharing(true);
+
+      // Listen for when user stops sharing via browser UI
+      screenStream.getVideoTracks()[0].onended = () => {
+        stopScreenShare();
+      };
+
+    } catch (err) {
+      console.error('Error starting screen share:', err);
+      alert('Не удалось начать демонстрацию экрана');
+    }
+  };
+
+  const stopScreenShare = async () => {
+    // Stop screen stream
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach(track => track.stop());
+      screenStreamRef.current = null;
+    }
+
+    // Switch back to camera
+    if (callRef.current && callRef.current.peerConnection && myStreamRef.current) {
+      const videoTrack = myStreamRef.current.getVideoTracks()[0];
+      const sender = callRef.current.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+      if (sender) {
+        sender.replaceTrack(videoTrack);
+      }
+    }
+
+    // Notify remote user that we stopped sharing
+    if (dataConnRef.current) {
+      dataConnRef.current.send({ type: 'screen-share-stop' });
+    }
+
+    setIsScreenSharing(false);
   };
 
   const switchVideo = () => {
@@ -909,7 +1010,43 @@ const VideoCall = () => {
 
       {/* Video Grid - Fullscreen */}
       <div className="absolute inset-0">
-        {isMobile ? (
+        {(isScreenSharing || remoteScreenSharing) && isConnected ? (
+          // Screen Sharing Layout - Screen fullscreen, cameras in top right corner
+          <>
+            {/* Screen Share Video - Fullscreen */}
+            <div className="absolute inset-0 bg-black flex items-center justify-center overflow-hidden">
+              <video
+                ref={isScreenSharing ? screenVideoRef : remoteVideoRef}
+                autoPlay
+                playsInline
+                className="w-full h-full object-contain"
+              />
+            </div>
+
+            {/* Small Cameras in Top Right Corner */}
+            <div className="absolute top-4 right-4 z-20 flex gap-2">
+              {/* My Camera */}
+              <div className="w-32 h-24 bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-white/20">
+                <video
+                  ref={mySmallCameraRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover mirror"
+                />
+              </div>
+              {/* Remote Camera */}
+              <div className="w-32 h-24 bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-white/20">
+                <video
+                  ref={isScreenSharing ? remoteSmallCameraRef : myVideoRef}
+                  autoPlay
+                  playsInline
+                  className={`w-full h-full object-cover ${!isScreenSharing ? 'mirror' : ''}`}
+                />
+              </div>
+            </div>
+          </>
+        ) : isMobile ? (
           // Mobile Layout - WhatsApp Style with draggable small video
           <>
             {/* Large Video */}
@@ -1121,6 +1258,20 @@ const VideoCall = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
               </svg>
             )}
+          </button>
+
+          <button
+            onClick={isScreenSharing ? stopScreenShare : startScreenShare}
+            className={`group relative p-4 rounded-2xl transition-all duration-200 ${
+              isScreenSharing
+                ? 'bg-gradient-to-br from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 shadow-lg shadow-indigo-500/50'
+                : 'bg-gradient-to-br from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 shadow-lg'
+            } text-white active:scale-95`}
+            title={isScreenSharing ? 'Остановить демонстрацию' : 'Демонстрация экрана'}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
           </button>
 
           <button
