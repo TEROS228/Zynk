@@ -58,6 +58,7 @@ const VideoCall = () => {
   const myStreamRef = useRef(null);
   const remoteStreamRef = useRef(null);
   const screenStreamRef = useRef(null);
+  const myCameraStreamRef = useRef(null); // Separate camera stream for screen sharing mode
   const callRef = useRef(null);
   const dataConnRef = useRef(null);
   const dragAnimationFrameRef = useRef(null);
@@ -110,11 +111,16 @@ const VideoCall = () => {
     const isSpecialMode = (isScreenSharing || remoteScreenSharing) || (isWhiteboardActive || remoteWhiteboardActive);
 
     if (isSpecialMode && isConnected) {
-      // Set my camera to small camera ref (always my camera stream - NOT screen)
-      if (mySmallCameraRef.current && myStreamRef.current && mySmallCameraRef.current.srcObject !== myStreamRef.current) {
-        mySmallCameraRef.current.srcObject = myStreamRef.current;
+      // For screen sharing: use myCameraStreamRef (saved camera) if available, otherwise myStreamRef
+      const myCameraSource = (isScreenSharing && myCameraStreamRef.current) ? myCameraStreamRef.current : myStreamRef.current;
+
+      // Set my camera to small camera ref (always my camera - NOT screen)
+      if (mySmallCameraRef.current && myCameraSource && mySmallCameraRef.current.srcObject !== myCameraSource) {
+        mySmallCameraRef.current.srcObject = myCameraSource;
       }
-      // Set remote camera to small camera ref (their camera or screen depending on what they're sharing)
+      // Set remote camera to small camera ref
+      // Note: when remote is sharing screen, remoteStreamRef contains their screen (via replaceTrack)
+      // We still show it because we can't access their camera separately
       if (remoteSmallCameraRef.current && remoteStreamRef.current && remoteSmallCameraRef.current.srcObject !== remoteStreamRef.current) {
         remoteSmallCameraRef.current.srcObject = remoteStreamRef.current;
       }
@@ -889,12 +895,21 @@ const VideoCall = () => {
 
       screenStreamRef.current = screenStream;
 
+      // Create a separate stream with just the camera for showing in small window
+      // Clone the camera track so it's not affected by replaceTrack
+      if (myStreamRef.current) {
+        const cameraTrack = myStreamRef.current.getVideoTracks()[0];
+        if (cameraTrack) {
+          myCameraStreamRef.current = new MediaStream([cameraTrack]);
+        }
+      }
+
       // Set screen to video element
       if (screenVideoRef.current) {
         screenVideoRef.current.srcObject = screenStream;
       }
 
-      // Replace video track in peer connection
+      // Replace video track in peer connection (this sends screen to remote)
       if (callRef.current && callRef.current.peerConnection) {
         const videoTrack = screenStream.getVideoTracks()[0];
         const sender = callRef.current.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
@@ -927,6 +942,9 @@ const VideoCall = () => {
       screenStreamRef.current.getTracks().forEach(track => track.stop());
       screenStreamRef.current = null;
     }
+
+    // Clear camera stream ref (don't stop tracks - they're still used in myStreamRef)
+    myCameraStreamRef.current = null;
 
     // Switch back to camera
     if (callRef.current && callRef.current.peerConnection && myStreamRef.current) {
@@ -1677,7 +1695,7 @@ const VideoCall = () => {
             )}
           </>
         ) : (isScreenSharing || remoteScreenSharing) && isConnected ? (
-          // Screen Sharing Layout - Screen fullscreen, cameras in corner
+          // Screen Sharing Layout - Screen fullscreen, both cameras in corner
           <>
             {/* Screen Share Video - Fullscreen */}
             <div className="absolute inset-0 bg-black flex items-center justify-center overflow-hidden">
@@ -1700,9 +1718,10 @@ const VideoCall = () => {
               )}
             </div>
 
-            {/* Small Camera in Top Right Corner - only show MY camera */}
-            <div className="absolute top-4 right-4 z-20">
-              <div className="w-40 h-28 bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-white/20 relative">
+            {/* Both Cameras in Top Right Corner */}
+            <div className="absolute top-4 right-4 z-20 flex gap-2">
+              {/* My Camera - always my camera (not screen) */}
+              <div className="w-32 h-24 bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-white/20 relative">
                 <video
                   ref={mySmallCameraRef}
                   autoPlay
@@ -1712,6 +1731,18 @@ const VideoCall = () => {
                 />
                 <div className="absolute bottom-1 left-1 px-2 py-0.5 bg-black/70 rounded text-white text-xs">
                   {userName}
+                </div>
+              </div>
+              {/* Remote Camera/Screen */}
+              <div className="w-32 h-24 bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-white/20 relative">
+                <video
+                  ref={remoteSmallCameraRef}
+                  autoPlay
+                  playsInline
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute bottom-1 left-1 px-2 py-0.5 bg-black/70 rounded text-white text-xs">
+                  Partner
                 </div>
               </div>
             </div>
